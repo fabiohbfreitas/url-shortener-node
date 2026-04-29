@@ -10,11 +10,10 @@ import {
   serializerCompiler,
   validatorCompiler,
 } from "fastify-zod-openapi";
-import { config as defaultConfig, type AppConfig } from "./config.js";
+import type { AppConfig } from "./config.js";
 import { registerHealthRoute } from "./routes/health.js";
-import { registerShortLinkRoutes } from "./routes/short-links.js";
 
-export const buildApp = async (config: AppConfig = defaultConfig) => {
+export const buildApp = async (config: AppConfig) => {
   const app = Fastify({ logger: true });
 
   app.setValidatorCompiler(validatorCompiler);
@@ -47,7 +46,6 @@ export const buildApp = async (config: AppConfig = defaultConfig) => {
   app.get(config.openApiPath, { schema: { hide: true } }, async () => app.swagger());
 
   await registerHealthRoute(app, config.serviceName);
-  await registerShortLinkRoutes(app);
 
   app.setErrorHandler((error, _request, reply) => {
     const parsed = parseError(error);

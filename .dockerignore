@@ -1,0 +1,10 @@
+.git
+.github
+openspec
+node_modules
+dist
+.env
+.env.*
+coverage
+npm-debug.log*
+Dockerfile*

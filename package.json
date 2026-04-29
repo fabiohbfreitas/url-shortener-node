@@ -4,7 +4,8 @@
   "description": "Node.js 24 + TypeScript Fastify service with Scalar/OpenAPI docs and structured logging",
   "main": "dist/server.js",
   "scripts": {
-    "test": "node --env-file=.env --test",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "dev": "node --env-file=.env --watch --import tsx src/server.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node --env-file=.env dist/server.js",
@@ -31,6 +32,7 @@
   "devDependencies": {
     "@types/node": "^25.6.0",
     "tsx": "^4.21.0",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.0.0-beta.18"
   }
 }
