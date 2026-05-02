@@ -1,9 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { useLogger } from "evlog/fastify";
-import type {
-  FastifyZodOpenApiSchema,
-  FastifyZodOpenApiTypeProvider,
-} from "fastify-zod-openapi";
+import type { FastifyZodOpenApiSchema, FastifyZodOpenApiTypeProvider } from "fastify-zod-openapi";
 import { z } from "zod/v4";
 
 export const registerHealthRoute = async (

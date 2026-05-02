@@ -1,6 +1,7 @@
 import { initLogger } from "evlog";
 import { buildApp } from "./app.js";
 import { config } from "./config.js";
+import { getDatabase } from "./db.js";
 
 const start = async (): Promise<void> => {
   initLogger({
@@ -10,7 +11,8 @@ const start = async (): Promise<void> => {
     },
   });
 
-  const app = await buildApp(config);
+  const db = getDatabase();
+  const app = await buildApp(config, db);
 
   try {
     await app.listen({

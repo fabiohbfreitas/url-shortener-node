@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../../app.js";
 import type { AppConfig } from "../../config.js";
+import type { DatabaseSync } from "../../db.js";
 
 const defaultTestConfig: AppConfig = {
   nodeEnv: "test",
@@ -14,4 +15,10 @@ const defaultTestConfig: AppConfig = {
 
 export const buildTestApp = async (
   configOverrides: Partial<AppConfig> = {},
-): Promise<FastifyInstance> => buildApp({ ...defaultTestConfig, ...configOverrides });
+  database?: DatabaseSync,
+): Promise<FastifyInstance> => {
+  const config = { ...defaultTestConfig, ...configOverrides };
+  const db = database ?? (await import("../../db.js")).getTestDatabase();
+  const app = await buildApp(config, db);
+  return app;
+};

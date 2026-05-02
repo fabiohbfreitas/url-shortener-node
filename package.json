@@ -1,7 +1,11 @@
 {
   "name": "url-shortener",
   "version": "1.0.0",
+  "private": true,
   "description": "Node.js 24 + TypeScript Fastify service with Scalar/OpenAPI docs and structured logging",
+  "keywords": [],
+  "author": "",
+  "type": "module",
   "main": "dist/server.js",
   "scripts": {
     "test": "vitest run",
@@ -9,14 +13,11 @@
     "dev": "node --env-file=.env --watch --import tsx src/server.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node --env-file=.env dist/server.js",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
-  },
-  "keywords": [],
-  "author": "",
-  "type": "module",
-  "private": true,
-  "engines": {
-    "node": ">=24"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check"
   },
   "dependencies": {
     "@fastify/swagger": "^9.7.0",
@@ -30,8 +31,13 @@
   },
   "devDependencies": {
     "@types/node": "^25.6.0",
+    "oxfmt": "^0.47.0",
+    "oxlint": "^1.62.0",
     "tsx": "^4.21.0",
     "typescript": "^6.0.3",
     "vitest": "^4.0.0-beta.18"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

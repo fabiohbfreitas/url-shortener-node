@@ -9,7 +9,7 @@
       "ESNext.Collection",
       "ESNext.Error",
       "ESNext.Iterator",
-      "ESNext.Promise",
+      "ESNext.Promise"
     ],
     "module": "nodenext",
     "moduleResolution": "nodenext",

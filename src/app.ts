@@ -12,8 +12,10 @@ import {
 } from "fastify-zod-openapi";
 import type { AppConfig } from "./config.js";
 import { registerHealthRoute } from "./routes/health.js";
+import { registerShortLinksRoutes } from "./routes/short-links.js";
+import type { DatabaseSync } from "./db.js";
 
-export const buildApp = async (config: AppConfig) => {
+export const buildApp = async (config: AppConfig, database: DatabaseSync) => {
   const app = Fastify({ logger: true });
 
   app.setValidatorCompiler(validatorCompiler);
@@ -28,8 +30,7 @@ export const buildApp = async (config: AppConfig) => {
       info: {
         title: "URL Shortener API",
         version: "1.0.0",
-        description:
-          "Node.js 24 + Fastify + Zod API foundation with Scalar documentation.",
+        description: "Node.js 24 + Fastify + Zod API foundation with Scalar documentation.",
       },
     },
     ...fastifyZodOpenApiTransformers,
@@ -46,6 +47,7 @@ export const buildApp = async (config: AppConfig) => {
   app.get(config.openApiPath, { schema: { hide: true } }, async () => app.swagger());
 
   await registerHealthRoute(app, config.serviceName);
+  await registerShortLinksRoutes(app, database);
 
   app.setErrorHandler((error, _request, reply) => {
     const parsed = parseError(error);
