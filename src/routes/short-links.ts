@@ -5,8 +5,10 @@ import { z } from "zod/v4";
 import {
   createShortLink,
   findShortLinkBySlug,
+  findShortLinkBySlugAndUserId,
   incrementVisits,
-  deleteShortLink,
+  deleteShortLinkBySlugAndUserId,
+  listShortLinksByUserId,
   ShortLinkSchema,
 } from "../db.js";
 import { generateUniqueSlug } from "../utils/slug.js";
@@ -29,6 +31,7 @@ const createShortLinkSchema = {
       fix: z.string().optional(),
       link: z.string().optional(),
     }),
+    401: z.object({ message: z.string() }),
   },
 } satisfies FastifyZodOpenApiSchema;
 
@@ -40,6 +43,7 @@ const getShortLinkSchema = {
   }),
   response: {
     200: ShortLinkSchema,
+    401: z.object({ message: z.string() }),
     404: z.object({
       message: z.string(),
     }),
@@ -54,6 +58,7 @@ const deleteShortLinkSchema = {
   }),
   response: {
     204: z.null().optional(),
+    401: z.object({ message: z.string() }),
     404: z.object({
       message: z.string(),
     }),
@@ -67,20 +72,54 @@ export const registerShortLinksRoutes = async (
   const db = database;
 
   app.withTypeProvider<FastifyZodOpenApiTypeProvider>().route({
+    method: "GET",
+    url: "/short-links",
+    schema: {
+      tags: ["short-links"],
+      summary: "List short links for authenticated user",
+      querystring: z.object({
+        page: z.coerce.number().int().min(1).default(1),
+        limit: z.coerce.number().int().min(1).default(10),
+      }),
+      response: {
+        200: z.object({
+          items: z.array(ShortLinkSchema),
+          total: z.number().int().min(0),
+        }),
+        401: z.object({ message: z.string() }),
+      },
+    } satisfies FastifyZodOpenApiSchema,
+    preHandler: app.authenticate,
+    handler: async (request, reply) => {
+      useLogger<{ route?: string }>().set({ route: "list-short-links" });
+
+      const userId = request.user.userId;
+      const page = request.query.page;
+      const limit = Math.min(request.query.limit, 50);
+
+      const result = listShortLinksByUserId(db, userId, page, limit);
+
+      return reply.status(200).send(result);
+    },
+  });
+
+  app.withTypeProvider<FastifyZodOpenApiTypeProvider>().route({
     method: "POST",
     url: "/short-links",
     schema: createShortLinkSchema,
+    preHandler: app.authenticate,
     handler: async (request, reply) => {
       useLogger<{ route?: string }>().set({ route: "create-short-link" });
 
       const { url } = request.body;
+      const userId = request.user.userId;
 
       const slug = generateUniqueSlug((s: string) => {
         const existing = findShortLinkBySlug(db, s);
         return existing !== undefined;
       });
 
-      const shortLink = createShortLink(db, slug, url);
+      const shortLink = createShortLink(db, slug, url, userId);
 
       const protocol = request.protocol;
       const host = request.host;
@@ -98,12 +137,14 @@ export const registerShortLinksRoutes = async (
     method: "GET",
     url: "/short-links/:slug",
     schema: getShortLinkSchema,
+    preHandler: app.authenticate,
     handler: async (request, reply) => {
       useLogger<{ route?: string }>().set({ route: "get-short-link" });
 
       const { slug } = request.params;
+      const userId = request.user.userId;
 
-      const shortLink = findShortLinkBySlug(db, slug);
+      const shortLink = findShortLinkBySlugAndUserId(db, slug, userId);
 
       if (!shortLink) {
         return reply.status(404).send({
@@ -115,6 +156,7 @@ export const registerShortLinksRoutes = async (
         id: shortLink.id,
         slug: shortLink.slug,
         original_url: shortLink.original_url,
+        user_id: shortLink.user_id,
         created_at: shortLink.created_at,
         visits: shortLink.visits,
       });
@@ -125,12 +167,14 @@ export const registerShortLinksRoutes = async (
     method: "DELETE",
     url: "/short-links/:slug",
     schema: deleteShortLinkSchema,
+    preHandler: app.authenticate,
     handler: async (request, reply) => {
       useLogger<{ route?: string }>().set({ route: "delete-short-link" });
 
       const { slug } = request.params;
+      const userId = request.user.userId;
 
-      const deleted = deleteShortLink(db, slug);
+      const deleted = deleteShortLinkBySlugAndUserId(db, slug, userId);
 
       if (!deleted) {
         return reply.status(404).send({

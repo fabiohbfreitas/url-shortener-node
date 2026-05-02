@@ -9,6 +9,9 @@ const defaultTestConfig: AppConfig = {
   serviceName: "url-shortener-api-test",
   host: "127.0.0.1",
   port: 3001,
+  jwtSecret: "test-jwt-secret-that-is-at-least-32-characters-long",
+  jwtAccessExpiresIn: "15m",
+  authCodeExpiresIn: "10m",
 };
 
 initLogger({

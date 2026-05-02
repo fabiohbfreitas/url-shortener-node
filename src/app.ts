@@ -11,8 +11,10 @@ import {
   validatorCompiler,
 } from "fastify-zod-openapi";
 import type { AppConfig } from "./config.js";
+import { registerAuthPlugin } from "./plugins/auth.js";
 import { registerHealthRoute } from "./routes/health.js";
 import { registerShortLinksRoutes } from "./routes/short-links.js";
+import { registerAuthRoutes } from "./routes/auth.js";
 import type { DatabaseSync } from "./db.js";
 
 export const buildApp = async (config: AppConfig, database: DatabaseSync) => {
@@ -46,6 +48,9 @@ export const buildApp = async (config: AppConfig, database: DatabaseSync) => {
 
   app.get("/openapi.json", { schema: { hide: true } }, async () => app.swagger());
 
+  await app.register(registerAuthPlugin, config);
+
+  await registerAuthRoutes(app, database);
   await registerHealthRoute(app, config.serviceName);
   await registerShortLinksRoutes(app, database);
 
