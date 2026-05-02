@@ -1,11 +1,24 @@
-# URL Shortener API Bootstrap
+# URL Shortener API
 
-Node.js 24 LTS + TypeScript + Fastify baseline with:
+Node.js 24 + Fastify + Zod with JWT auth, short links per user, and Scalar API docs.
 
-- OpenAPI generation
-- Scalar API docs
-- Structured request logging
-- Zod schemas shared across validation and docs
+## Tech Stack
+
+- Node.js 24+ (built-in `node:sqlite`)
+- Fastify with `fastify-zod-openapi`
+- JWT email-code authentication
+- Scalar API reference with JWT auth UI
+
+## Project Structure
+
+```
+src/
+├── domain/        # Types and Zod schemas
+├── services/       # Application logic
+├── infrastructure/  # Database and external concerns
+├── routes/         # HTTP handlers (thin)
+└── plugins/        # Fastify plugins
+```
 
 ## Requirements
 
@@ -15,13 +28,13 @@ Node.js 24 LTS + TypeScript + Fastify baseline with:
 ## Scripts
 
 - `npm run dev` - run with watch mode
-- `npm run build` - compile TypeScript to `dist/`
+- `npm run build` - compile TypeScript
 - `npm run start` - run compiled server
-- `npm run typecheck` - type check without emitting
-- `npm test` - run tests once with Vitest
-- `npm run test:watch` - run Vitest in watch mode
+- `npm test` - run tests
+- `npm run lint` - lint with oxlint
+- `npm run format` - format with oxfmt
 
-## Run locally
+## Run Locally
 
 ```bash
 npm install
@@ -29,29 +42,23 @@ cp .env.example .env
 npm run dev
 ```
 
-Configured endpoints (from `.env`):
+Endpoints:
 
-- API base: `http://localhost:3000`
+- API: `http://localhost:3000`
 - Health: `GET /health`
-- OpenAPI JSON: `GET /openapi.json`
-- Swagger UI: `GET /swagger`
-- Scalar docs: `GET /docs`
+- Docs: `GET /docs`
+- OpenAPI: `GET /openapi.json`
 
-> The server now relies on `.env` values (validated with Zod) and does not use built-in defaults.
+## Auth Flow
+
+1. `POST /auth/login` with `{ "email": "user@example.com" }` - receives code (logged to console during development)
+2. `POST /auth/login/verify` with `{ "email": "...", "code": "123456" }` - returns JWT
+3. Use JWT in `Authorization: Bearer <token>` header for protected routes
 
 ## Testing
 
-Tests use Vitest plus Fastify's in-process `app.inject()` helpers, so no network port binding is required.
+Tests use Vitest with Fastify's `app.inject()` (no port binding required).
 
 ```bash
 npm test
-```
-
-## Container deployment
-
-Build and run:
-
-```bash
-docker build -t url-shortener:distroless .
-docker run --rm -p 3000:3000 --env-file .env url-shortener:distroless
 ```
