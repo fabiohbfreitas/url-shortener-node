@@ -2,6 +2,7 @@
   "name": "url-shortener",
   "version": "1.0.0",
   "private": true,
+  "license": "UNLICENSE",
   "description": "Node.js 24 + TypeScript Fastify service with Scalar/OpenAPI docs and structured logging",
   "keywords": [],
   "author": "",
