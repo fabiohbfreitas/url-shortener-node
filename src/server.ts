@@ -9,6 +9,7 @@ const start = async (): Promise<void> => {
       service: config.serviceName,
       environment: config.nodeEnv,
     },
+    pretty: config.nodeEnv === "development",
   });
 
   const db = getDatabase();
@@ -20,7 +21,7 @@ const start = async (): Promise<void> => {
       port: config.port,
     });
     app.log.info(
-      `Server running at http://${config.host}:${config.port} (docs: ${config.docsPath}, openapi: ${config.openApiPath})`,
+      `Server running at http://${config.host}:${config.port} (docs: /docs, openapi: /openapi.json)`,
     );
   } catch (error) {
     app.log.error(error);

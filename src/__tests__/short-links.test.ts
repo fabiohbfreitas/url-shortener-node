@@ -43,6 +43,48 @@ describe("POST /short-links", () => {
     });
 
     expect(response.statusCode).toBe(400);
+    const body = response.json();
+    expect(body).toHaveProperty("message");
+    expect(typeof body.message).toBe("string");
+    expect(body.message).toContain("url");
+  });
+
+  it("returns 400 for missing URL in request body", async () => {
+    const db = new DatabaseSync(":memory:");
+    initializeDatabase(db);
+    const app = await buildTestApp({}, db);
+    appsToClose.push(app);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/short-links",
+      payload: {},
+    });
+
+    expect(response.statusCode).toBe(400);
+    const body = response.json();
+    expect(body).toHaveProperty("message");
+    expect(typeof body.message).toBe("string");
+    expect(body.message).toContain("url");
+  });
+
+  it("returns 400 for non-string URL", async () => {
+    const db = new DatabaseSync(":memory:");
+    initializeDatabase(db);
+    const app = await buildTestApp({}, db);
+    appsToClose.push(app);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/short-links",
+      payload: { url: 123 },
+    });
+
+    expect(response.statusCode).toBe(400);
+    const body = response.json();
+    expect(body).toHaveProperty("message");
+    expect(typeof body.message).toBe("string");
+    expect(body.message).toContain("url");
   });
 });
 
@@ -85,6 +127,9 @@ describe("GET /short-links/:slug", () => {
     });
 
     expect(response.statusCode).toBe(404);
+    const body = response.json();
+    expect(body).toHaveProperty("message", "Short link not found");
+    expect(typeof body.message).toBe("string");
   });
 });
 
@@ -130,6 +175,9 @@ describe("GET /:slug (redirect)", () => {
     });
 
     expect(response.statusCode).toBe(404);
+    const body = response.json();
+    expect(body).toHaveProperty("message", "Short link not found");
+    expect(typeof body.message).toBe("string");
   });
 });
 
@@ -173,5 +221,8 @@ describe("DELETE /short-links/:slug", () => {
     });
 
     expect(response.statusCode).toBe(404);
+    const body = response.json();
+    expect(body).toHaveProperty("message", "Short link not found");
+    expect(typeof body.message).toBe("string");
   });
 });

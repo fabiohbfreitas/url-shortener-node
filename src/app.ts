@@ -16,7 +16,7 @@ import { registerShortLinksRoutes } from "./routes/short-links.js";
 import type { DatabaseSync } from "./db.js";
 
 export const buildApp = async (config: AppConfig, database: DatabaseSync) => {
-  const app = Fastify({ logger: true });
+  const app = Fastify({ logger: false });
 
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
@@ -37,14 +37,14 @@ export const buildApp = async (config: AppConfig, database: DatabaseSync) => {
   });
 
   await app.register(fastifySwaggerUi, {
-    routePrefix: config.swaggerPath,
+    routePrefix: "/swagger",
   });
 
   await app.register(scalarApiReference, {
-    routePrefix: config.docsPath,
+    routePrefix: "/docs",
   });
 
-  app.get(config.openApiPath, { schema: { hide: true } }, async () => app.swagger());
+  app.get("/openapi.json", { schema: { hide: true } }, async () => app.swagger());
 
   await registerHealthRoute(app, config.serviceName);
   await registerShortLinksRoutes(app, database);
