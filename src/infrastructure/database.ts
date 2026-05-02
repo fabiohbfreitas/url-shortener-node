@@ -1,14 +1,15 @@
 import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { z } from "zod/v4";
+import type { User, AuthCode } from "../domain/user.js";
+import type { ShortLink } from "../domain/short-link.js";
 
 export type { DatabaseSync };
 
 const currentFilename = fileURLToPath(import.meta.url);
 const currentDirname = dirname(currentFilename);
 
-const DB_PATH = join(currentDirname, "../data/urls.db");
+const DB_PATH = join(currentDirname, "../../data/urls.db");
 
 let db: DatabaseSync | null = null;
 
@@ -76,27 +77,6 @@ export const initializeDatabase = (database: DatabaseSync): void => {
     CREATE INDEX IF NOT EXISTS idx_short_links_user_id ON short_links(user_id)
   `);
 };
-
-export const UserSchema = z.object({
-  id: z.number().int().positive(),
-  email: z.string().email(),
-  created_at: z.string(),
-  updated_at: z.string(),
-  last_login_at: z.string().nullable(),
-});
-
-export type User = z.infer<typeof UserSchema>;
-
-export const AuthCodeSchema = z.object({
-  id: z.number().int().positive(),
-  user_id: z.number().int().positive(),
-  code: z.string().min(1),
-  expires_at: z.string(),
-  used_at: z.string().nullable(),
-  created_at: z.string(),
-});
-
-export type AuthCode = z.infer<typeof AuthCodeSchema>;
 
 export const findOrCreateUser = (database: DatabaseSync, email: string): User => {
   const findStmt = database.prepare(`
@@ -241,17 +221,6 @@ export const findUserById = (database: DatabaseSync, id: number): User | undefin
     last_login_at: row.last_login_at,
   };
 };
-
-export const ShortLinkSchema = z.object({
-  id: z.number().int().positive(),
-  slug: z.string().min(1),
-  original_url: z.string().url(),
-  user_id: z.number().int().positive(),
-  created_at: z.string(),
-  visits: z.number().int().min(0),
-});
-
-export type ShortLink = z.infer<typeof ShortLinkSchema>;
 
 export const createShortLink = (
   database: DatabaseSync,

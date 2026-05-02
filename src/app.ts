@@ -15,9 +15,16 @@ import { registerAuthPlugin } from "./plugins/auth.js";
 import { registerHealthRoute } from "./routes/health.js";
 import { registerShortLinksRoutes } from "./routes/short-links.js";
 import { registerAuthRoutes } from "./routes/auth.js";
-import type { DatabaseSync } from "./db.js";
+import type { DatabaseSync } from "./infrastructure/database.js";
+import { AuthService } from "./services/auth-service.js";
+import { ShortLinkService } from "./services/short-link-service.js";
+import type { AuthNotifier } from "./infrastructure/auth-notifier.js";
 
-export const buildApp = async (config: AppConfig, database: DatabaseSync) => {
+export const buildApp = async (
+  config: AppConfig,
+  database: DatabaseSync,
+  authNotifier: AuthNotifier,
+) => {
   const app = Fastify({ logger: false });
 
   app.setValidatorCompiler(validatorCompiler);
@@ -34,6 +41,15 @@ export const buildApp = async (config: AppConfig, database: DatabaseSync) => {
         version: "1.0.0",
         description: "Node.js 24 + Fastify + Zod API foundation with Scalar documentation.",
       },
+      components: {
+        securitySchemes: {
+          bearerAuth: {
+            type: "http",
+            scheme: "bearer",
+            bearerFormat: "JWT",
+          },
+        },
+      },
     },
     ...fastifyZodOpenApiTransformers,
   });
@@ -44,15 +60,24 @@ export const buildApp = async (config: AppConfig, database: DatabaseSync) => {
 
   await app.register(scalarApiReference, {
     routePrefix: "/docs",
+    configuration: {
+      persistAuth: true,
+      authentication: {
+        preferredSecurityScheme: "bearerAuth",
+      },
+    },
   });
 
   app.get("/openapi.json", { schema: { hide: true } }, async () => app.swagger());
 
   await app.register(registerAuthPlugin, config);
 
-  await registerAuthRoutes(app, database);
+  const authService = new AuthService(database, authNotifier, app);
+  const shortLinkService = new ShortLinkService(database);
+
+  await registerAuthRoutes(app, authService);
   await registerHealthRoute(app, config.serviceName);
-  await registerShortLinksRoutes(app, database);
+  await registerShortLinksRoutes(app, shortLinkService);
 
   app.setErrorHandler((error, _request, reply) => {
     const parsed = parseError(error);

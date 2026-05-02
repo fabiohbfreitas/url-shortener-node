@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildTestApp } from "./test-utils/build-test-app.js";
-import { getTestDatabase, initializeDatabase, findValidAuthCode } from "../db.js";
+import {
+  getTestDatabase,
+  initializeDatabase,
+  findValidAuthCode,
+} from "../infrastructure/database.js";
 import { DatabaseSync } from "node:sqlite";
 
 const appsToClose: Array<Awaited<ReturnType<typeof buildTestApp>>> = [];

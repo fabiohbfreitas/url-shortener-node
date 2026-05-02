@@ -1,7 +1,16 @@
 import { initLogger } from "evlog";
 import { buildApp } from "./app.js";
 import { config } from "./config.js";
-import { getDatabase } from "./db.js";
+import { getDatabase } from "./infrastructure/database.js";
+import { ConsoleAuthNotifier, NoopAuthNotifier } from "./infrastructure/auth-notifier.js";
+import type { AuthNotifier } from "./infrastructure/auth-notifier.js";
+
+const createAuthNotifier = (): AuthNotifier => {
+  if (config.nodeEnv === "test") {
+    return new NoopAuthNotifier();
+  }
+  return new ConsoleAuthNotifier();
+};
 
 const start = async (): Promise<void> => {
   initLogger({
@@ -12,8 +21,9 @@ const start = async (): Promise<void> => {
     pretty: config.nodeEnv === "development",
   });
 
+  const authNotifier = createAuthNotifier();
   const db = getDatabase();
-  const app = await buildApp(config, db);
+  const app = await buildApp(config, db, authNotifier);
 
   try {
     await app.listen({
