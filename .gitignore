@@ -25,6 +25,10 @@ yarn-error.log*
 # Build
 *.tsbuildinfo
 
+# Frontend
+apps/frontend/dist/
+apps/frontend/node_modules/
+
 # OS
 .DS_Store
 Thumbs.db

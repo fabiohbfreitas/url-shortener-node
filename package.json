@@ -6,5 +6,9 @@
   "license": "UNLICENSE",
   "workspaces": [
     "apps/*"
-  ]
+  ],
+  "scripts": {
+    "dev": "pnpm --parallel --filter \"./apps/*\" dev",
+    "build": "pnpm -r run build"
+  }
 }
