@@ -1,4 +1,4 @@
-const BASE = import.meta.env.VITE_BACKEND_URL;
+export const BASE = import.meta.env.VITE_BACKEND_URL;
 if (!BASE) throw new Error("VITE_BACKEND_URL is not set");
 
 export async function apiFetch(path: string, options?: RequestInit) {

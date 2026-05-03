@@ -314,9 +314,7 @@ No `ring-*` — border color change is the only focus indicator.
 <nav class="border-b border-border py-5">
   <div class="max-w-5xl mx-auto px-6 flex items-center justify-between">
     <!-- Logo -->
-    <div
-      class="flex items-center gap-2 font-mono text-sm font-medium text-primary"
-    >
+    <div class="flex items-center gap-2 font-mono text-sm font-medium text-primary">
       <span class="w-2 h-2 rounded-full bg-accent"></span>
       shrt
     </div>
@@ -338,9 +336,7 @@ No `ring-*` — border color change is the only focus indicator.
 ### 6.8 Section Label
 
 ```html
-<span
-  class="flex items-center gap-2 font-mono text-2xs uppercase tracking-widest text-muted"
->
+<span class="flex items-center gap-2 font-mono text-2xs uppercase tracking-widest text-muted">
   <span class="w-1.5 h-1.5 rounded-full bg-accent"></span>
   Recent links
 </span>
