@@ -23,17 +23,17 @@ export class MemoryUserRepository implements IUserRepository {
     return user;
   }
 
-  async findAuthCode(email: string, code: string): Promise<(AuthCodeDocument & { email: string }) | null> {
+  async findAuthCode(
+    email: string,
+    code: string,
+  ): Promise<(AuthCodeDocument & { email: string }) | null> {
     const user = await this.findUserByEmail(email);
     if (!user) return null;
 
     const now = new Date();
     const found = this.authCodes.find(
       (ac) =>
-        ac.userId === user!._id &&
-        ac.code === code &&
-        !ac.usedAt &&
-        new Date(ac.expiresAt) > now
+        ac.userId === user!._id && ac.code === code && !ac.usedAt && new Date(ac.expiresAt) > now,
     );
 
     if (!found) return null;
@@ -66,6 +66,10 @@ export class MemoryUserRepository implements IUserRepository {
     if (authCode) {
       authCode.usedAt = new Date().toISOString() as any;
     }
+  }
+
+  async findById(id: string): Promise<UserDocument | null> {
+    return this.users.find((u) => u._id === id) || null;
   }
 
   async updateLastLogin(userId: string): Promise<void> {

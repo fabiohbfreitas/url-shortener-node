@@ -2,9 +2,9 @@
   "name": "url-shortener",
   "version": "1.0.0",
   "private": true,
-  "license": "UNLICENSE",
   "description": "Node.js 24 + TypeScript Fastify service with Scalar/OpenAPI docs and structured logging",
   "keywords": [],
+  "license": "UNLICENSE",
   "author": "",
   "type": "module",
   "main": "dist/server.js",
@@ -22,13 +22,12 @@
     "db:reset": "rm -f data/urls.db"
   },
   "dependencies": {
-    "@fastify/jwt": "^10.0.0",
+    "@fastify/cookie": "^11.0.2",
     "@fastify/swagger": "^9.7.0",
     "@fastify/swagger-ui": "^5.2.6",
     "@scalar/fastify-api-reference": "^1.53.1",
     "evlog": "^2.14.0",
     "fastify": "^5.8.5",
-    "fastify-type-provider-zod": "^6.1.0",
     "fastify-zod-openapi": "^5.6.1",
     "mongodb": "^7.2.0",
     "nanoid": "^5.1.11",
@@ -37,7 +36,6 @@
   },
   "devDependencies": {
     "@types/node": "^25.6.0",
-    "mongodb-memory-server": "^11.1.0",
     "oxfmt": "^0.47.0",
     "oxlint": "^1.62.0",
     "tsx": "^4.21.0",

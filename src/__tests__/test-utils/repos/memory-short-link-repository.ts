@@ -5,7 +5,11 @@ export class MemoryShortLinkRepository implements IShortLinkRepository {
   private shortLinks: ShortLinkDocument[] = [];
   private idCounter = 1;
 
-  async createShortLink(slug: string, originalUrl: string, userId: string): Promise<ShortLinkDocument> {
+  async createShortLink(
+    slug: string,
+    originalUrl: string,
+    userId: string,
+  ): Promise<ShortLinkDocument> {
     const now = new Date();
     const shortLink: ShortLinkDocument = {
       _id: String(this.idCounter++),
@@ -25,7 +29,10 @@ export class MemoryShortLinkRepository implements IShortLinkRepository {
     return this.shortLinks.find((sl) => sl.slug === slug) || null;
   }
 
-  async findShortLinkBySlugAndUserId(slug: string, userId: string): Promise<ShortLinkDocument | null> {
+  async findShortLinkBySlugAndUserId(
+    slug: string,
+    userId: string,
+  ): Promise<ShortLinkDocument | null> {
     return this.shortLinks.find((sl) => sl.slug === slug && sl.userId === userId) || null;
   }
 

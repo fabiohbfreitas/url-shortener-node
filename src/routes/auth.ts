@@ -3,6 +3,7 @@ import type { FastifyZodOpenApiSchema } from "fastify-zod-openapi";
 import { z } from "zod/v4";
 import type { FastifyInstance } from "fastify";
 import type { AuthService } from "../services/auth-service.js";
+import { authenticateSession } from "../plugins/session.js";
 
 const requestCodeSchema = {
   tags: ["auth"],
@@ -18,14 +19,55 @@ const requestCodeSchema = {
 
 const verifyCodeSchema = {
   tags: ["auth"],
-  summary: "Verify code and get access token",
+  summary: "Verify code and set session cookie",
   body: z.object({
     email: z.string().email(),
     code: z.string().length(6),
   }),
   response: {
-    200: z.object({ accessToken: z.string() }),
+    200: {
+      description: "Successfully authenticated. Session cookie set in Set-Cookie header.",
+      headers: {
+        "Set-Cookie": {
+          schema: { type: "string" },
+          description: "sessionId=<uuid>; HttpOnly; Secure; SameSite=Strict",
+        },
+      },
+      content: {
+        "application/json": {
+          schema: z.object({
+            user: z.object({
+              userId: z.string(),
+              email: z.string(),
+            }),
+          }),
+        },
+      },
+    },
     400: z.object({ message: z.string() }),
+    401: z.object({ message: z.string() }),
+  },
+} satisfies FastifyZodOpenApiSchema;
+
+const meSchema = {
+  tags: ["auth"],
+  summary: "Get current user info",
+  security: [{ cookieAuth: [] }],
+  response: {
+    200: z.object({
+      userId: z.string(),
+      email: z.string(),
+    }),
+    401: z.object({ message: z.string() }),
+  },
+} satisfies FastifyZodOpenApiSchema;
+
+const logoutSchema = {
+  tags: ["auth"],
+  summary: "Logout and clear session",
+  security: [{ cookieAuth: [] }],
+  response: {
+    200: z.object({ message: z.string() }),
     401: z.object({ message: z.string() }),
   },
 } satisfies FastifyZodOpenApiSchema;
@@ -53,11 +95,48 @@ export const registerAuthRoutes = async (
       const { email, code } = request.body;
 
       try {
-        const result = await authService.verify(email, code);
-        return reply.status(200).send(result);
+        const { sessionId, user } = await authService.verify(email, code);
+
+        reply.setCookie("sessionId", sessionId, {
+          httpOnly: true,
+          secure: false, // Set based on NODE_ENV in real app
+          sameSite: "strict",
+          maxAge: 7 * 24 * 60 * 60, // 7 days in seconds
+          path: "/",
+        });
+
+        return reply.status(200).send({ user });
       } catch {
         return reply.status(401).send({ message: "Invalid or expired code" });
       }
+    },
+  });
+
+  app.withTypeProvider<FastifyZodOpenApiTypeProvider>().route({
+    method: "GET",
+    url: "/auth/me",
+    schema: meSchema,
+    preHandler: authenticateSession,
+    handler: async (request, reply) => {
+      return reply.status(200).send({
+        userId: request.user.userId,
+        email: request.user.email,
+      });
+    },
+  });
+
+  app.withTypeProvider<FastifyZodOpenApiTypeProvider>().route({
+    method: "POST",
+    url: "/auth/logout",
+    schema: logoutSchema,
+    preHandler: authenticateSession,
+    handler: async (request, reply) => {
+      const sessionId = request.cookies?.sessionId;
+      if (sessionId) {
+        await authService.logout(sessionId);
+        reply.clearCookie("sessionId");
+      }
+      return reply.status(200).send({ message: "Logged out successfully" });
     },
   });
 };

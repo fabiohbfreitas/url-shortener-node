@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildTestApp, type TestApp } from "./test-utils/build-test-app.js";
 
-interface AuthResponse {
-  accessToken: string;
+interface VerifyResponse {
+  user: {
+    userId: string;
+    email: string;
+  };
 }
 
 interface ShortLinkResponse {
@@ -15,8 +18,6 @@ interface ListResponse {
   items: Array<{ slug: string; originalUrl: string; visits: number }>;
   total: number;
 }
-
-const BASE_URL = "http://127.0.0.1:3001";
 
 async function loginAndVerify(app: TestApp, email: string): Promise<string> {
   await app.inject({
@@ -33,25 +34,19 @@ async function loginAndVerify(app: TestApp, email: string): Promise<string> {
     payload: { email, code },
   });
 
-  const { accessToken } = JSON.parse(verifyResponse.body) as AuthResponse;
-  return accessToken;
+  const cookies = verifyResponse.cookies;
+  const sessionCookie = cookies?.find((c) => c.name === "sessionId");
+  return sessionCookie?.value || "";
 }
 
 describe("Short Links API", () => {
   let app: TestApp;
-  let accessToken: string;
+  let sessionCookie: string;
   const testEmail = "test@example.com";
 
   beforeEach(async () => {
     app = await buildTestApp();
-    accessToken = await loginAndVerify(app, testEmail);
-    
-    // Debug: verify token works
-    const verifyResp = await app.inject({
-      method: "POST",
-      url: "/auth/verify",
-      payload: { email: testEmail, code: app.testAuthNotifier.lastCode },
-    });
+    sessionCookie = await loginAndVerify(app, testEmail);
   });
 
   describe("POST /short-links", () => {
@@ -59,7 +54,7 @@ describe("Short Links API", () => {
       const response = await app.inject({
         method: "POST",
         url: "/short-links",
-        headers: { authorization: `Bearer ${accessToken}` },
+        headers: { cookie: `sessionId=${sessionCookie}` },
         payload: { url: "https://example.com" },
       });
 
@@ -74,14 +69,14 @@ describe("Short Links API", () => {
       const response1 = await app.inject({
         method: "POST",
         url: "/short-links",
-        headers: { authorization: `Bearer ${accessToken}` },
+        headers: { cookie: `sessionId=${sessionCookie}` },
         payload: { url: "https://example.com/1" },
       });
 
       const response2 = await app.inject({
         method: "POST",
         url: "/short-links",
-        headers: { authorization: `Bearer ${accessToken}` },
+        headers: { cookie: `sessionId=${sessionCookie}` },
         payload: { url: "https://example.com/2" },
       });
 
@@ -97,14 +92,14 @@ describe("Short Links API", () => {
       const response1 = await app.inject({
         method: "POST",
         url: "/short-links",
-        headers: { authorization: `Bearer ${accessToken}` },
+        headers: { cookie: `sessionId=${sessionCookie}` },
         payload: { url: "https://example.com" },
       });
 
       const response2 = await app.inject({
         method: "POST",
         url: "/short-links",
-        headers: { authorization: `Bearer ${accessToken}` },
+        headers: { cookie: `sessionId=${sessionCookie}` },
         payload: { url: "https://example.com" },
       });
 
@@ -116,7 +111,7 @@ describe("Short Links API", () => {
       const response = await app.inject({
         method: "POST",
         url: "/short-links",
-        headers: { authorization: `Bearer ${accessToken}` },
+        headers: { cookie: `sessionId=${sessionCookie}` },
         payload: { url: "not-a-url" },
       });
 
@@ -139,21 +134,21 @@ describe("Short Links API", () => {
       await app.inject({
         method: "POST",
         url: "/short-links",
-        headers: { authorization: `Bearer ${accessToken}` },
+        headers: { cookie: `sessionId=${sessionCookie}` },
         payload: { url: "https://example.com/1" },
       });
 
       await app.inject({
         method: "POST",
         url: "/short-links",
-        headers: { authorization: `Bearer ${accessToken}` },
+        headers: { cookie: `sessionId=${sessionCookie}` },
         payload: { url: "https://example.com/2" },
       });
 
       const response = await app.inject({
         method: "GET",
         url: "/short-links",
-        headers: { authorization: `Bearer ${accessToken}` },
+        headers: { cookie: `sessionId=${sessionCookie}` },
       });
 
       expect(response.statusCode).toBe(200);
@@ -166,7 +161,7 @@ describe("Short Links API", () => {
       const response = await app.inject({
         method: "GET",
         url: "/short-links",
-        headers: { authorization: `Bearer ${accessToken}` },
+        headers: { cookie: `sessionId=${sessionCookie}` },
       });
 
       expect(response.statusCode).toBe(200);
@@ -180,7 +175,7 @@ describe("Short Links API", () => {
         await app.inject({
           method: "POST",
           url: "/short-links",
-          headers: { authorization: `Bearer ${accessToken}` },
+          headers: { cookie: `sessionId=${sessionCookie}` },
           payload: { url: `https://example.com/${i}` },
         });
       }
@@ -188,7 +183,7 @@ describe("Short Links API", () => {
       const response = await app.inject({
         method: "GET",
         url: "/short-links?page=1&limit=3",
-        headers: { authorization: `Bearer ${accessToken}` },
+        headers: { cookie: `sessionId=${sessionCookie}` },
       });
 
       expect(response.statusCode).toBe(200);
@@ -200,7 +195,7 @@ describe("Short Links API", () => {
       const r1 = await app.inject({
         method: "POST",
         url: "/short-links",
-        headers: { authorization: `Bearer ${accessToken}` },
+        headers: { cookie: `sessionId=${sessionCookie}` },
         payload: { url: "https://example.com/old" },
       });
 
@@ -210,14 +205,14 @@ describe("Short Links API", () => {
       const r2 = await app.inject({
         method: "POST",
         url: "/short-links",
-        headers: { authorization: `Bearer ${accessToken}` },
+        headers: { cookie: `sessionId=${sessionCookie}` },
         payload: { url: "https://example.com/new" },
       });
 
       const listResponse = await app.inject({
         method: "GET",
         url: "/short-links",
-        headers: { authorization: `Bearer ${accessToken}` },
+        headers: { cookie: `sessionId=${sessionCookie}` },
       });
 
       const body = JSON.parse(listResponse.body) as ListResponse;
@@ -229,22 +224,22 @@ describe("Short Links API", () => {
       await app.inject({
         method: "POST",
         url: "/short-links",
-        headers: { authorization: `Bearer ${accessToken}` },
+        headers: { cookie: `sessionId=${sessionCookie}` },
         payload: { url: "https://example.com/user1" },
       });
 
-      const otherToken = await loginAndVerify(app, "other@example.com");
+      const otherSessionCookie = await loginAndVerify(app, "other@example.com");
       await app.inject({
         method: "POST",
         url: "/short-links",
-        headers: { authorization: `Bearer ${otherToken}` },
+        headers: { cookie: `sessionId=${otherSessionCookie}` },
         payload: { url: "https://example.com/user2" },
       });
 
       const response = await app.inject({
         method: "GET",
         url: "/short-links",
-        headers: { authorization: `Bearer ${accessToken}` },
+        headers: { cookie: `sessionId=${sessionCookie}` },
       });
 
       const body = JSON.parse(response.body) as ListResponse;
@@ -258,7 +253,7 @@ describe("Short Links API", () => {
       const createResponse = await app.inject({
         method: "POST",
         url: "/short-links",
-        headers: { authorization: `Bearer ${accessToken}` },
+        headers: { cookie: `sessionId=${sessionCookie}` },
         payload: { url: "https://example.com/test" },
       });
 
@@ -267,7 +262,7 @@ describe("Short Links API", () => {
       const response = await app.inject({
         method: "GET",
         url: `/short-links/${slug}`,
-        headers: { authorization: `Bearer ${accessToken}` },
+        headers: { cookie: `sessionId=${sessionCookie}` },
       });
 
       expect(response.statusCode).toBe(200);
@@ -280,7 +275,7 @@ describe("Short Links API", () => {
       const response = await app.inject({
         method: "GET",
         url: "/short-links/nonexistent",
-        headers: { authorization: `Bearer ${accessToken}` },
+        headers: { cookie: `sessionId=${sessionCookie}` },
       });
 
       expect(response.statusCode).toBe(404);
@@ -290,17 +285,17 @@ describe("Short Links API", () => {
       const createResponse = await app.inject({
         method: "POST",
         url: "/short-links",
-        headers: { authorization: `Bearer ${accessToken}` },
+        headers: { cookie: `sessionId=${sessionCookie}` },
         payload: { url: "https://example.com/private" },
       });
 
       const { slug } = JSON.parse(createResponse.body) as ShortLinkResponse;
 
-      const otherToken = await loginAndVerify(app, "other@example.com");
+      const otherSessionCookie = await loginAndVerify(app, "other@example.com");
       const response = await app.inject({
         method: "GET",
         url: `/short-links/${slug}`,
-        headers: { authorization: `Bearer ${otherToken}` },
+        headers: { cookie: `sessionId=${otherSessionCookie}` },
       });
 
       expect(response.statusCode).toBe(404);
@@ -312,7 +307,7 @@ describe("Short Links API", () => {
       const createResponse = await app.inject({
         method: "POST",
         url: "/short-links",
-        headers: { authorization: `Bearer ${accessToken}` },
+        headers: { cookie: `sessionId=${sessionCookie}` },
         payload: { url: "https://example.com/todelete" },
       });
 
@@ -321,7 +316,7 @@ describe("Short Links API", () => {
       const deleteResponse = await app.inject({
         method: "DELETE",
         url: `/short-links/${slug}`,
-        headers: { authorization: `Bearer ${accessToken}` },
+        headers: { cookie: `sessionId=${sessionCookie}` },
       });
 
       expect(deleteResponse.statusCode).toBe(204);
@@ -329,7 +324,7 @@ describe("Short Links API", () => {
       const getResponse = await app.inject({
         method: "GET",
         url: `/short-links/${slug}`,
-        headers: { authorization: `Bearer ${accessToken}` },
+        headers: { cookie: `sessionId=${sessionCookie}` },
       });
 
       expect(getResponse.statusCode).toBe(404);
@@ -339,7 +334,7 @@ describe("Short Links API", () => {
       const response = await app.inject({
         method: "DELETE",
         url: "/short-links/nonexistent",
-        headers: { authorization: `Bearer ${accessToken}` },
+        headers: { cookie: `sessionId=${sessionCookie}` },
       });
 
       expect(response.statusCode).toBe(404);
@@ -349,17 +344,17 @@ describe("Short Links API", () => {
       const createResponse = await app.inject({
         method: "POST",
         url: "/short-links",
-        headers: { authorization: `Bearer ${accessToken}` },
+        headers: { cookie: `sessionId=${sessionCookie}` },
         payload: { url: "https://example.com/private" },
       });
 
       const { slug } = JSON.parse(createResponse.body) as ShortLinkResponse;
 
-      const otherToken = await loginAndVerify(app, "other@example.com");
+      const otherSessionCookie = await loginAndVerify(app, "other@example.com");
       const response = await app.inject({
         method: "DELETE",
         url: `/short-links/${slug}`,
-        headers: { authorization: `Bearer ${otherToken}` },
+        headers: { cookie: `sessionId=${otherSessionCookie}` },
       });
 
       expect(response.statusCode).toBe(404);
@@ -371,7 +366,7 @@ describe("Short Links API", () => {
       const createResponse = await app.inject({
         method: "POST",
         url: "/short-links",
-        headers: { authorization: `Bearer ${accessToken}` },
+        headers: { cookie: `sessionId=${sessionCookie}` },
         payload: { url: "https://example.com/redirect" },
       });
 
@@ -399,7 +394,7 @@ describe("Short Links API", () => {
       const createResponse = await app.inject({
         method: "POST",
         url: "/short-links",
-        headers: { authorization: `Bearer ${accessToken}` },
+        headers: { cookie: `sessionId=${sessionCookie}` },
         payload: { url: "https://example.com/visits" },
       });
 
@@ -413,7 +408,7 @@ describe("Short Links API", () => {
       const getResponse = await app.inject({
         method: "GET",
         url: `/short-links/${slug}`,
-        headers: { authorization: `Bearer ${accessToken}` },
+        headers: { cookie: `sessionId=${sessionCookie}` },
       });
 
       const body = JSON.parse(getResponse.body);

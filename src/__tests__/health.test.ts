@@ -9,7 +9,7 @@ afterEach(async () => {
 
 describe("GET /health", () => {
   it("returns service health payload", async () => {
-    const app = await buildTestApp({ serviceName: "health-suite" });
+    const app = await buildTestApp();
     appsToClose.push(app);
 
     const response = await app.inject({
@@ -20,7 +20,7 @@ describe("GET /health", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({
       ok: true,
-      service: "health-suite",
+      service: "url-shortener-api-test",
     });
   });
 });

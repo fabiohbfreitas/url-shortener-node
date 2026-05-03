@@ -1,6 +1,6 @@
-import type { FastifyInstance } from "fastify";
 import type { AuthNotifier } from "../infrastructure/auth-notifier.js";
 import type { IUserRepository } from "../infrastructure/user-repository.js";
+import type { SessionRepository } from "../infrastructure/session-repository.js";
 import { customAlphabet } from "nanoid";
 
 const numericAlphabet = "0123456789";
@@ -10,7 +10,8 @@ export class AuthService {
   constructor(
     private userRepo: IUserRepository,
     private authNotifier: AuthNotifier,
-    private app: FastifyInstance,
+    private sessionRepository: SessionRepository,
+    private sessionExpiresIn: number,
   ) {}
 
   async login(email: string): Promise<{ message: string }> {
@@ -32,7 +33,10 @@ export class AuthService {
     return { message: "Verification code sent" };
   }
 
-  async verify(email: string, code: string): Promise<{ accessToken: string }> {
+  async verify(
+    email: string,
+    code: string,
+  ): Promise<{ sessionId: string; user: { userId: string; email: string } }> {
     const authCode = await this.userRepo.findAuthCode(email, code);
 
     if (!authCode) {
@@ -43,11 +47,31 @@ export class AuthService {
 
     await this.userRepo.updateLastLogin(authCode.userId);
 
-    const token = this.app.jwt.sign({
-      userId: authCode.userId,
-      email,
+    const sessionId = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + this.sessionExpiresIn);
+
+    await this.sessionRepository.create({
+      sessionId,
+      userId: authCode.userId.toString(),
+      expiresAt,
     });
 
-    return { accessToken: token };
+    const user = await this.userRepo.findUserByEmail(email);
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    return {
+      sessionId,
+      user: { userId: user._id.toString(), email: user.email },
+    };
+  }
+
+  async logout(sessionId: string): Promise<void> {
+    await this.sessionRepository.deleteBySessionId(sessionId);
+  }
+
+  async logoutAll(userId: string): Promise<void> {
+    await this.sessionRepository.deleteByUserId(userId);
   }
 }

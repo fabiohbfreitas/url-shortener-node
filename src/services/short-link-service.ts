@@ -43,7 +43,9 @@ export class ShortLinkService {
     return await this.shortLinkRepo.deleteShortLinkBySlugAndUserId(slug, userId);
   }
 
-  async redirect(slug: string): Promise<{ originalUrl: string } | { message: string; status: number }> {
+  async redirect(
+    slug: string,
+  ): Promise<{ originalUrl: string } | { message: string; status: number }> {
     const shortLink = await this.shortLinkRepo.findShortLinkBySlug(slug);
 
     if (!shortLink) {

@@ -69,7 +69,7 @@ describe("Auth API", () => {
   });
 
   describe("POST /auth/verify", () => {
-    it("should verify code and return access token", async () => {
+    it("should verify code and set session cookie", async () => {
       await app.inject({
         method: "POST",
         url: "/auth/login",
@@ -86,7 +86,15 @@ describe("Auth API", () => {
 
       expect(response.statusCode).toBe(200);
       const body = JSON.parse(response.body);
-      expect(body).toHaveProperty("accessToken");
+      expect(body).toHaveProperty("user");
+      expect(body.user).toHaveProperty("userId");
+      expect(body.user).toHaveProperty("email");
+
+      // Check that session cookie is set
+      const cookies = response.cookies;
+      const sessionCookie = cookies?.find((c) => c.name === "sessionId");
+      expect(sessionCookie).toBeDefined();
+      expect(sessionCookie?.httpOnly).toBe(true);
     });
 
     it("should reject invalid code", async () => {
@@ -167,6 +175,83 @@ describe("Auth API", () => {
       });
 
       expect(response.statusCode).toBe(401);
+    });
+  });
+
+  describe("GET /auth/me", () => {
+    it("should return user info when authenticated", async () => {
+      await app.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: { email: "test@example.com" },
+      });
+
+      const code = app.testAuthNotifier.lastCode;
+
+      const verifyResponse = await app.inject({
+        method: "POST",
+        url: "/auth/verify",
+        payload: { email: "test@example.com", code },
+      });
+
+      const cookies = verifyResponse.cookies;
+      const sessionCookie = cookies?.find((c) => c.name === "sessionId");
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/auth/me",
+        headers: {
+          cookie: `sessionId=${sessionCookie?.value}`,
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body).toHaveProperty("userId");
+      expect(body).toHaveProperty("email");
+      expect(body.email).toBe("test@example.com");
+    });
+
+    it("should return 401 when not authenticated", async () => {
+      const response = await app.inject({
+        method: "GET",
+        url: "/auth/me",
+      });
+
+      expect(response.statusCode).toBe(401);
+    });
+  });
+
+  describe("POST /auth/logout", () => {
+    it("should clear session cookie and return success", async () => {
+      await app.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: { email: "test@example.com" },
+      });
+
+      const code = app.testAuthNotifier.lastCode;
+
+      const verifyResponse = await app.inject({
+        method: "POST",
+        url: "/auth/verify",
+        payload: { email: "test@example.com", code },
+      });
+
+      const cookies = verifyResponse.cookies;
+      const sessionCookie = cookies?.find((c) => c.name === "sessionId");
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/auth/logout",
+        headers: {
+          cookie: `sessionId=${sessionCookie?.value}`,
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.message).toBe("Logged out successfully");
     });
   });
 });

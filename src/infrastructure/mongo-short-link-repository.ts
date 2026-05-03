@@ -4,7 +4,11 @@ import type { IShortLinkRepository } from "./short-link-repository.js";
 export class MongoShortLinkRepository implements IShortLinkRepository {
   constructor(private ShortLink: any) {}
 
-  async createShortLink(slug: string, originalUrl: string, userId: string): Promise<ShortLinkDocument> {
+  async createShortLink(
+    slug: string,
+    originalUrl: string,
+    userId: string,
+  ): Promise<ShortLinkDocument> {
     const shortLink = await this.ShortLink.insertOne({
       slug,
       originalUrl,
@@ -18,15 +22,15 @@ export class MongoShortLinkRepository implements IShortLinkRepository {
     return await this.ShortLink.findOne({ slug });
   }
 
-  async findShortLinkBySlugAndUserId(slug: string, userId: string): Promise<ShortLinkDocument | null> {
+  async findShortLinkBySlugAndUserId(
+    slug: string,
+    userId: string,
+  ): Promise<ShortLinkDocument | null> {
     return await this.ShortLink.findOne({ slug, userId });
   }
 
   async incrementVisits(slug: string): Promise<void> {
-    await this.ShortLink.updateOne(
-      { slug },
-      { $inc: { visits: 1 } }
-    );
+    await this.ShortLink.updateOne({ slug }, { $inc: { visits: 1 } });
   }
 
   async deleteShortLinkBySlugAndUserId(slug: string, userId: string): Promise<boolean> {
@@ -48,7 +52,7 @@ export class MongoShortLinkRepository implements IShortLinkRepository {
         sort: { createdAt: -1 },
         skip: offset,
         limit: cappedLimit,
-      }
+      },
     );
 
     const total = await this.ShortLink.countDocuments({ userId });

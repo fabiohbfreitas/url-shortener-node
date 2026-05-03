@@ -1,17 +1,17 @@
 import "fastify";
-import "@fastify/jwt";
+import { SessionRepository } from "../infrastructure/session-repository";
+import { UserRepository } from "../infrastructure/user-repository";
 
 declare module "fastify" {
-  export interface FastifyInstance {
-    authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
-  }
-}
-
-declare module "@fastify/jwt" {
-  interface FastifyJWT {
+  export interface FastifyRequest {
     user: {
       userId: string;
       email: string;
     };
+  }
+
+  export interface FastifyInstance {
+    sessionRepository: SessionRepository;
+    userRepository: UserRepository;
   }
 }

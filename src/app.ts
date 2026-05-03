@@ -1,3 +1,4 @@
+import fastifyCookie from "@fastify/cookie";
 import fastifySwagger from "@fastify/swagger";
 import fastifySwaggerUi from "@fastify/swagger-ui";
 import scalarApiReference from "@scalar/fastify-api-reference";
@@ -11,7 +12,6 @@ import {
   validatorCompiler,
 } from "fastify-zod-openapi";
 import type { AppConfig } from "./config.js";
-import { registerAuthPlugin } from "./plugins/auth.js";
 import { registerHealthRoute } from "./routes/health.js";
 import { registerShortLinksRoutes } from "./routes/short-links.js";
 import { registerAuthRoutes } from "./routes/auth.js";
@@ -20,12 +20,13 @@ import { AuthService } from "./services/auth-service.js";
 import { ShortLinkService } from "./services/short-link-service.js";
 import type { IUserRepository } from "./infrastructure/user-repository.js";
 import type { IShortLinkRepository } from "./infrastructure/short-link-repository.js";
-
+import type { SessionRepository } from "./infrastructure/session-repository.js";
 export const buildApp = async (
   config: AppConfig,
   userRepo: IUserRepository,
   shortLinkRepo: IShortLinkRepository,
   authNotifier: AuthNotifier,
+  sessionRepo: SessionRepository,
 ) => {
   const app = Fastify({ logger: false });
 
@@ -33,6 +34,8 @@ export const buildApp = async (
   app.setSerializerCompiler(serializerCompiler);
 
   await app.register(evlog);
+
+  await app.register(fastifyCookie);
 
   await app.register(fastifyZodOpenApiPlugin);
   await app.register(fastifySwagger, {
@@ -45,10 +48,11 @@ export const buildApp = async (
       },
       components: {
         securitySchemes: {
-          bearerAuth: {
-            type: "http",
-            scheme: "bearer",
-            bearerFormat: "JWT",
+          cookieAuth: {
+            type: "apiKey",
+            in: "cookie",
+            name: "sessionId",
+            description: "Session cookie for authentication",
           },
         },
       },
@@ -65,27 +69,28 @@ export const buildApp = async (
     configuration: {
       persistAuth: true,
       authentication: {
-        preferredSecurityScheme: "bearerAuth",
+        preferredSecurityScheme: "cookieAuth",
       },
     },
   });
 
   app.get("/openapi.json", { schema: { hide: true } }, async () => app.swagger());
 
-  await app.register(registerAuthPlugin, config);
+  app.decorate("sessionRepository", sessionRepo);
+  app.decorate("userRepository", userRepo);
 
-  const authService = new AuthService(userRepo, authNotifier, app);
+  const authService = new AuthService(userRepo, authNotifier, sessionRepo, config.sessionExpiresIn);
   const shortLinkService = new ShortLinkService(shortLinkRepo);
 
   await registerAuthRoutes(app, authService);
   await registerHealthRoute(app, config.serviceName);
   await registerShortLinksRoutes(app, shortLinkService);
 
-  app.setErrorHandler((error, _request, reply) => {
+  app.setErrorHandler((error: any, _request, reply) => {
+    const status = error.statusCode || error.status || 500;
     const parsed = parseError(error);
-    const status = parsed.status ?? 500;
     return reply.status(status).send({
-      message: parsed.message,
+      message: parsed.message || error.message,
       why: parsed.why,
       fix: parsed.fix,
       link: parsed.link,

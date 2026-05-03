@@ -6,5 +6,9 @@ export interface IShortLinkRepository {
   findShortLinkBySlugAndUserId(slug: string, userId: string): Promise<ShortLinkDocument | null>;
   incrementVisits(slug: string): Promise<void>;
   deleteShortLinkBySlugAndUserId(slug: string, userId: string): Promise<boolean>;
-  listShortLinksByUserId(userId: string, page: number, limit: number): Promise<{ items: ShortLinkDocument[]; total: number }>;
+  listShortLinksByUserId(
+    userId: string,
+    page: number,
+    limit: number,
+  ): Promise<{ items: ShortLinkDocument[]; total: number }>;
 }

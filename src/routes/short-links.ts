@@ -3,11 +3,12 @@ import type { FastifyZodOpenApiSchema, FastifyZodOpenApiTypeProvider } from "fas
 import { z } from "zod/v4";
 import type { ShortLinkService } from "../services/short-link-service.js";
 import { ShortLinkSchema } from "../domain/short-link.js";
+import { authenticateSession } from "../plugins/session.js";
 
 const createShortLinkSchema = {
   tags: ["short-links"],
   summary: "Create a new short link",
-  security: [{ bearerAuth: [] }],
+  security: [{ cookieAuth: [] }],
   body: z.object({
     url: z.string().url(),
   }),
@@ -30,7 +31,7 @@ const createShortLinkSchema = {
 const getShortLinkSchema = {
   tags: ["short-links"],
   summary: "Get short link details",
-  security: [{ bearerAuth: [] }],
+  security: [{ cookieAuth: [] }],
   params: z.object({
     slug: z.string(),
   }),
@@ -46,7 +47,7 @@ const getShortLinkSchema = {
 const deleteShortLinkSchema = {
   tags: ["short-links"],
   summary: "Delete a short link",
-  security: [{ bearerAuth: [] }],
+  security: [{ cookieAuth: [] }],
   params: z.object({
     slug: z.string(),
   }),
@@ -69,7 +70,7 @@ export const registerShortLinksRoutes = async (
     schema: {
       tags: ["short-links"],
       summary: "List short links for authenticated user",
-      security: [{ bearerAuth: [] }],
+      security: [{ cookieAuth: [] }],
       querystring: z.object({
         page: z.coerce.number().int().min(1).default(1),
         limit: z.coerce.number().int().min(1).default(10),
@@ -82,7 +83,7 @@ export const registerShortLinksRoutes = async (
         401: z.object({ message: z.string() }),
       },
     } satisfies FastifyZodOpenApiSchema,
-    preHandler: app.authenticate,
+    preHandler: authenticateSession,
     handler: async (request, reply) => {
       const userId = request.user.userId;
       const page = request.query.page;
@@ -98,7 +99,7 @@ export const registerShortLinksRoutes = async (
     method: "POST",
     url: "/short-links",
     schema: createShortLinkSchema,
-    preHandler: app.authenticate,
+    preHandler: authenticateSession,
     handler: async (request, reply) => {
       const { url } = request.body;
       const userId = request.user.userId;
@@ -113,7 +114,7 @@ export const registerShortLinksRoutes = async (
     method: "GET",
     url: "/short-links/:slug",
     schema: getShortLinkSchema,
-    preHandler: app.authenticate,
+    preHandler: authenticateSession,
     handler: async (request, reply) => {
       const { slug } = request.params;
       const userId = request.user.userId;
@@ -134,7 +135,7 @@ export const registerShortLinksRoutes = async (
     method: "DELETE",
     url: "/short-links/:slug",
     schema: deleteShortLinkSchema,
-    preHandler: app.authenticate,
+    preHandler: authenticateSession,
     handler: async (request, reply) => {
       const { slug } = request.params;
       const userId = request.user.userId;
