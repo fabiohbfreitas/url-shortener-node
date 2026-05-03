@@ -75,6 +75,7 @@ const logoutSchema = {
 export const registerAuthRoutes = async (
   app: FastifyInstance,
   authService: AuthService,
+  config: { cookieSecure: boolean; sameSite: "strict" | "lax"; sessionExpiresIn: number },
 ): Promise<void> => {
   app.withTypeProvider<FastifyZodOpenApiTypeProvider>().route({
     method: "POST",
@@ -99,9 +100,9 @@ export const registerAuthRoutes = async (
 
         reply.setCookie("sessionId", sessionId, {
           httpOnly: true,
-          secure: false, // Set based on NODE_ENV in real app
-          sameSite: "strict",
-          maxAge: 7 * 24 * 60 * 60, // 7 days in seconds
+          secure: config.cookieSecure,
+          sameSite: config.sameSite,
+          maxAge: config.sessionExpiresIn,
           path: "/",
         });
 

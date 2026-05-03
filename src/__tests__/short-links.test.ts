@@ -199,7 +199,6 @@ describe("Short Links API", () => {
         payload: { url: "https://example.com/old" },
       });
 
-      // Small delay to ensure different timestamps
       await new Promise((resolve) => setTimeout(resolve, 10));
 
       const r2 = await app.inject({

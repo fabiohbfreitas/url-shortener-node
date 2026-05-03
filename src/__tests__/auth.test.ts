@@ -90,7 +90,6 @@ describe("Auth API", () => {
       expect(body.user).toHaveProperty("userId");
       expect(body.user).toHaveProperty("email");
 
-      // Check that session cookie is set
       const cookies = response.cookies;
       const sessionCookie = cookies?.find((c) => c.name === "sessionId");
       expect(sessionCookie).toBeDefined();

@@ -48,7 +48,7 @@ export class AuthService {
     await this.userRepo.updateLastLogin(authCode.userId);
 
     const sessionId = crypto.randomUUID();
-    const expiresAt = new Date(Date.now() + this.sessionExpiresIn);
+    const expiresAt = new Date(Date.now() + this.sessionExpiresIn * 1000);
 
     await this.sessionRepository.create({
       sessionId,

@@ -82,7 +82,11 @@ export const buildApp = async (
   const authService = new AuthService(userRepo, authNotifier, sessionRepo, config.sessionExpiresIn);
   const shortLinkService = new ShortLinkService(shortLinkRepo);
 
-  await registerAuthRoutes(app, authService);
+  await registerAuthRoutes(app, authService, {
+    cookieSecure: config.cookieSecure,
+    sameSite: config.sameSite,
+    sessionExpiresIn: config.sessionExpiresIn,
+  });
   await registerHealthRoute(app, config.serviceName);
   await registerShortLinksRoutes(app, shortLinkService);
 

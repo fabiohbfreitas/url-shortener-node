@@ -17,7 +17,7 @@ const testConfig: AppConfig = {
   authCodeExpiresIn: "10m",
   mongodbUri: "mongodb://localhost:27017/test",
   sessionCookieDomain: undefined,
-  sessionExpiresIn: 7 * 24 * 60 * 60 * 1000,
+  sessionExpiresIn: 7 * 24 * 60 * 60,
   cookieSecure: false,
   sameSite: "strict",
 };

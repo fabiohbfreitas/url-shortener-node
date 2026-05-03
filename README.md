@@ -5,7 +5,7 @@ Node.js 24 + Fastify + MongoDB 8 with email-code auth and short links per user.
 ## Tech Stack
 
 - Node.js 24+, Fastify, MongoDB 8 (native driver)
-- Email-code auth (magic link style), Scalar API docs
+- Email-code auth with sessions, Scalar API docs
 - Zod validation, oxlint + oxfmt
 
 ## Quick Start
