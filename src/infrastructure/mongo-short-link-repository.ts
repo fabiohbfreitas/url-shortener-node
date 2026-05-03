@@ -1,40 +1,59 @@
 import { ShortLinkDocument } from "./db.js";
 import type { IShortLinkRepository } from "./short-link-repository.js";
+import type { Collection } from "mongodb";
 
 export class MongoShortLinkRepository implements IShortLinkRepository {
-  constructor(private ShortLink: any) {}
+  constructor(private shortLinkCollection: Collection) {}
 
   async createShortLink(
     slug: string,
     originalUrl: string,
     userId: string,
   ): Promise<ShortLinkDocument> {
-    const shortLink = await this.ShortLink.insertOne({
+    const now = new Date();
+    const result = await this.shortLinkCollection.insertOne({
       slug,
       originalUrl,
       userId,
       visits: 0,
+      createdAt: now,
+      updatedAt: now,
     });
-    return shortLink as ShortLinkDocument;
+    return {
+      _id: result.insertedId.toString(),
+      slug,
+      originalUrl,
+      userId,
+      visits: 0,
+      createdAt: now,
+      updatedAt: now,
+    };
   }
 
   async findShortLinkBySlug(slug: string): Promise<ShortLinkDocument | null> {
-    return await this.ShortLink.findOne({ slug });
+    const shortLink = await this.shortLinkCollection.findOne({ slug });
+    if (!shortLink) return null;
+    return { ...shortLink, _id: shortLink._id.toString() } as ShortLinkDocument;
   }
 
   async findShortLinkBySlugAndUserId(
     slug: string,
     userId: string,
   ): Promise<ShortLinkDocument | null> {
-    return await this.ShortLink.findOne({ slug, userId });
+    const shortLink = await this.shortLinkCollection.findOne({ slug, userId });
+    if (!shortLink) return null;
+    return { ...shortLink, _id: shortLink._id.toString() } as ShortLinkDocument;
   }
 
   async incrementVisits(slug: string): Promise<void> {
-    await this.ShortLink.updateOne({ slug }, { $inc: { visits: 1 } });
+    await this.shortLinkCollection.updateOne(
+      { slug },
+      { $inc: { visits: 1 }, $set: { updatedAt: new Date() } },
+    );
   }
 
   async deleteShortLinkBySlugAndUserId(slug: string, userId: string): Promise<boolean> {
-    const result = await this.ShortLink.deleteOne({ slug, userId });
+    const result = await this.shortLinkCollection.deleteOne({ slug, userId });
     return result.deletedCount === 1;
   }
 
@@ -46,17 +65,18 @@ export class MongoShortLinkRepository implements IShortLinkRepository {
     const cappedLimit = Math.min(limit, 50);
     const offset = (page - 1) * cappedLimit;
 
-    const items = await this.ShortLink.find(
-      { userId },
-      {
-        sort: { createdAt: -1 },
-        skip: offset,
-        limit: cappedLimit,
-      },
-    );
+    const items = await this.shortLinkCollection
+      .find({ userId })
+      .sort({ createdAt: -1 })
+      .skip(offset)
+      .limit(cappedLimit)
+      .toArray();
 
-    const total = await this.ShortLink.countDocuments({ userId });
+    const total = await this.shortLinkCollection.countDocuments({ userId });
 
-    return { items, total };
+    return {
+      items: items.map((item) => ({ ...item, _id: item._id.toString() })) as ShortLinkDocument[],
+      total,
+    };
   }
 }

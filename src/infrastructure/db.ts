@@ -1,43 +1,4 @@
-import Papr from "papr";
-import { schema, types } from "papr";
-import { MongoClient } from "mongodb";
-
-const UserSchema = schema(
-  {
-    email: types.string({ required: true }),
-    lastLoginAt: types.string(),
-  },
-  { timestamps: true },
-);
-
-const AuthCodeSchema = schema(
-  {
-    userId: types.string({ required: true }),
-    code: types.string({ required: true }),
-    expiresAt: types.string({ required: true }),
-    usedAt: types.string(),
-  },
-  { timestamps: true },
-);
-
-const ShortLinkSchema = schema(
-  {
-    slug: types.string({ required: true }),
-    originalUrl: types.string({ required: true }),
-    userId: types.string({ required: true }),
-    visits: types.number({ required: true }),
-  },
-  { timestamps: true },
-);
-
-const SessionSchema = schema(
-  {
-    sessionId: types.string({ required: true }),
-    userId: types.string({ required: true }),
-    expiresAt: types.date({ required: true }),
-  },
-  { timestamps: true },
-);
+import { MongoClient, Collection } from "mongodb";
 
 export type UserDocument = {
   _id: string;
@@ -78,17 +39,9 @@ export type SessionDocument = {
 };
 
 export const createDatabase = async (uri: string, dbName: string) => {
-  const papr = new Papr();
-
-  const User = papr.model("users", UserSchema);
-  const AuthCode = papr.model("auth_codes", AuthCodeSchema);
-  const ShortLink = papr.model("short_links", ShortLinkSchema);
-  const Session = papr.model("sessions", SessionSchema);
-
   const client = new MongoClient(uri);
   await client.connect();
   const db = client.db(dbName);
-  papr.initialize(db);
 
   await db.collection("users").createIndex({ email: 1 }, { unique: true });
   await db.collection("auth_codes").createIndex({ userId: 1 });
@@ -97,5 +50,19 @@ export const createDatabase = async (uri: string, dbName: string) => {
   await db.collection("sessions").createIndex({ sessionId: 1 }, { unique: true });
   await db.collection("sessions").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
-  return { papr, User, AuthCode, ShortLink, Session, client };
+  return {
+    userCollection: db.collection("users"),
+    authCodeCollection: db.collection("auth_codes"),
+    shortLinkCollection: db.collection("short_links"),
+    sessionCollection: db.collection("sessions"),
+    client,
+  };
+};
+
+export type DatabaseCollections = {
+  userCollection: Collection;
+  authCodeCollection: Collection;
+  shortLinkCollection: Collection;
+  sessionCollection: Collection;
+  client: MongoClient;
 };

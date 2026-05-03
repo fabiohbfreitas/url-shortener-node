@@ -9,14 +9,12 @@ import { createDatabase } from "./infrastructure/db.js";
 const start = async () => {
   const appConfig = getConfig();
 
-  const { User, AuthCode, ShortLink, Session } = await createDatabase(
-    appConfig.mongodbUri,
-    "url-shortener",
-  );
+  const { userCollection, authCodeCollection, shortLinkCollection, sessionCollection, client } =
+    await createDatabase(appConfig.mongodbUri, "url-shortener");
 
-  const userRepo = new MongoUserRepository(User, AuthCode);
-  const shortLinkRepo = new MongoShortLinkRepository(ShortLink);
-  const sessionRepo = new MongoSessionRepository(Session);
+  const userRepo = new MongoUserRepository(userCollection, authCodeCollection);
+  const shortLinkRepo = new MongoShortLinkRepository(shortLinkCollection);
+  const sessionRepo = new MongoSessionRepository(sessionCollection);
   const authNotifier = new ConsoleAuthNotifier();
 
   const app = await buildApp(appConfig, userRepo, shortLinkRepo, authNotifier, sessionRepo);
@@ -30,6 +28,7 @@ const start = async () => {
 
   const shutdown = async () => {
     await app.close();
+    await client.close();
     process.exit(0);
   };
 
