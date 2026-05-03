@@ -41,6 +41,8 @@ export const buildApp = async (
   await app.register(fastifyCors, {
     origin: [config.frontendUrl],
     credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
+    allowedHeaders: ["Content-Type"],
   });
 
   await app.register(fastifyZodOpenApiPlugin);
