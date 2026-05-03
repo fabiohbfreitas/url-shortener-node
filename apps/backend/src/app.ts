@@ -1,4 +1,5 @@
 import fastifyCookie from "@fastify/cookie";
+import fastifyCors from "@fastify/cors";
 import fastifySwagger from "@fastify/swagger";
 import fastifySwaggerUi from "@fastify/swagger-ui";
 import scalarApiReference from "@scalar/fastify-api-reference";
@@ -36,6 +37,11 @@ export const buildApp = async (
   await app.register(evlog);
 
   await app.register(fastifyCookie);
+
+  await app.register(fastifyCors, {
+    origin: [config.frontendUrl],
+    credentials: true,
+  });
 
   await app.register(fastifyZodOpenApiPlugin);
   await app.register(fastifySwagger, {

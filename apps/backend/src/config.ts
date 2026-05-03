@@ -11,6 +11,7 @@ export type AppConfig = {
   sessionExpiresIn: number;
   cookieSecure: boolean;
   sameSite: "strict" | "lax";
+  frontendUrl: string;
 };
 
 const envSchema = z.object({
@@ -26,6 +27,7 @@ const envSchema = z.object({
     .int()
     .positive()
     .default(7 * 24 * 60 * 60),
+  FRONTEND_URL: z.string().min(1),
 });
 
 export function getConfig(): AppConfig {
@@ -42,5 +44,6 @@ export function getConfig(): AppConfig {
     sessionExpiresIn: env.SESSION_EXPIRES_IN,
     cookieSecure: env.NODE_ENV === "production",
     sameSite: env.SESSION_COOKIE_DOMAIN ? "lax" : "strict",
+    frontendUrl: env.FRONTEND_URL,
   };
 }
