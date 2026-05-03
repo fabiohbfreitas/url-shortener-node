@@ -11,6 +11,7 @@ coverage/
 apps/backend/.env
 apps/backend/.env.local
 apps/backend/.env.*.local
+apps/frontend/.env
 
 # Data
 data/

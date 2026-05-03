@@ -1,4 +1,5 @@
-const BASE = "http://localhost:3000";
+const BASE = import.meta.env.VITE_BACKEND_URL;
+if (!BASE) throw new Error("VITE_BACKEND_URL is not set");
 
 export async function apiFetch(path: string, options?: RequestInit) {
   const res = await fetch(`${BASE}${path}`, {
