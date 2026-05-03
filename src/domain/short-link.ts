@@ -1,12 +1,13 @@
 import { z } from "zod/v4";
 
 export const ShortLinkSchema = z.object({
-  id: z.number().int().positive(),
+  _id: z.any(),
   slug: z.string().min(1),
-  original_url: z.string().url(),
-  user_id: z.number().int().positive(),
-  created_at: z.string(),
+  originalUrl: z.string().url(),
+  userId: z.any(),
   visits: z.number().int().min(0),
+  createdAt: z.any(),
+  updatedAt: z.any(),
 });
 
 export type ShortLink = z.infer<typeof ShortLinkSchema>;

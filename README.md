@@ -1,11 +1,12 @@
 # URL Shortener API
 
-Node.js 24 + Fastify + Zod with JWT auth, short links per user, and Scalar API docs.
+Node.js 24 + Fastify + MongoDB with JWT auth, short links per user, and Scalar API docs.
 
 ## Tech Stack
 
 - Node.js 24+ (built-in `node:sqlite`)
 - Fastify with `fastify-zod-openapi`
+- MongoDB with `papr` ODM
 - JWT email-code authentication
 - Scalar API reference with JWT auth UI
 
@@ -24,6 +25,7 @@ src/
 
 - Node.js 24+
 - npm 10+
+- MongoDB 8
 
 ## Scripts
 
@@ -39,6 +41,7 @@ src/
 ```bash
 npm install
 cp .env.example .env
+docker compose up -d  # Start MongoDB
 npm run dev
 ```
 
@@ -57,8 +60,16 @@ Endpoints:
 
 ## Testing
 
-Tests use Vitest with Fastify's `app.inject()` (no port binding required).
+Tests use Vitest with in-memory MongoDB (mongodb-memory-server).
 
 ```bash
 npm test
+```
+
+## Docker
+
+Start MongoDB for development (avoids rebuilding image):
+
+```bash
+docker compose up -d
 ```

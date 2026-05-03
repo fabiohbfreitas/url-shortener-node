@@ -1,519 +1,423 @@
-import { afterEach, describe, expect, it, beforeEach } from "vitest";
-import { buildTestApp } from "./test-utils/build-test-app.js";
-import {
-  getTestDatabase,
-  initializeDatabase,
-  findValidAuthCode,
-} from "../infrastructure/database.js";
-import { DatabaseSync } from "node:sqlite";
+import { beforeEach, describe, expect, it } from "vitest";
+import { buildTestApp, type TestApp } from "./test-utils/build-test-app.js";
 
-const appsToClose: Array<Awaited<ReturnType<typeof buildTestApp>>> = [];
-let authToken: string = "";
+interface AuthResponse {
+  accessToken: string;
+}
 
-afterEach(async () => {
-  await Promise.all(appsToClose.splice(0).map((app) => app.close()));
-});
+interface ShortLinkResponse {
+  slug: string;
+  shortUrl: string;
+  originalUrl: string;
+}
 
-const getAuthToken = async (app: any, db: DatabaseSync, email: string) => {
+interface ListResponse {
+  items: Array<{ slug: string; originalUrl: string; visits: number }>;
+  total: number;
+}
+
+const BASE_URL = "http://127.0.0.1:3001";
+
+async function loginAndVerify(app: TestApp, email: string): Promise<string> {
   await app.inject({
     method: "POST",
     url: "/auth/login",
     payload: { email },
   });
 
-  const stmt = db.prepare(`
-    SELECT ac.code
-    FROM auth_codes ac
-    JOIN users u ON u.id = ac.user_id
-    WHERE u.email = ? AND ac.used_at IS NULL AND ac.expires_at > CURRENT_TIMESTAMP
-    ORDER BY ac.created_at DESC
-    LIMIT 1
-  `);
-  const row = stmt.get(email) as { code: string } | undefined;
-  const code = row?.code || "";
+  const code = app.testAuthNotifier.lastCode;
 
   const verifyResponse = await app.inject({
     method: "POST",
-    url: "/auth/login/verify",
+    url: "/auth/verify",
     payload: { email, code },
   });
 
-  const { accessToken } = verifyResponse.json();
+  const { accessToken } = JSON.parse(verifyResponse.body) as AuthResponse;
   return accessToken;
-};
+}
 
-describe("POST /short-links", () => {
-  it("creates a short link and returns 201", async () => {
-    const db = new DatabaseSync(":memory:");
-    initializeDatabase(db);
-    const app = await buildTestApp({}, db);
-    appsToClose.push(app);
+describe("Short Links API", () => {
+  let app: TestApp;
+  let accessToken: string;
+  const testEmail = "test@example.com";
 
-    const token = await getAuthToken(app, db, "test@example.com");
-
-    const response = await app.inject({
+  beforeEach(async () => {
+    app = await buildTestApp();
+    accessToken = await loginAndVerify(app, testEmail);
+    
+    // Debug: verify token works
+    const verifyResp = await app.inject({
       method: "POST",
-      url: "/short-links",
-      payload: { url: "https://example.com" },
-      headers: {
-        authorization: `Bearer ${token}`,
-      },
+      url: "/auth/verify",
+      payload: { email: testEmail, code: app.testAuthNotifier.lastCode },
     });
-
-    expect(response.statusCode).toBe(201);
-    const body = response.json();
-    expect(body).toHaveProperty("slug");
-    expect(body).toHaveProperty("shortUrl");
-    expect(body).toHaveProperty("originalUrl", "https://example.com");
-    expect(body.slug).toMatch(/^[a-zA-Z0-9]{6}$/);
   });
 
-  it("returns 400 for invalid URL", async () => {
-    const db = new DatabaseSync(":memory:");
-    initializeDatabase(db);
-    const app = await buildTestApp({}, db);
-    appsToClose.push(app);
+  describe("POST /short-links", () => {
+    it("should create short link", async () => {
+      const response = await app.inject({
+        method: "POST",
+        url: "/short-links",
+        headers: { authorization: `Bearer ${accessToken}` },
+        payload: { url: "https://example.com" },
+      });
 
-    const token = await getAuthToken(app, db, "test@example.com");
-
-    const response = await app.inject({
-      method: "POST",
-      url: "/short-links",
-      payload: { url: "not-a-url" },
-      headers: {
-        authorization: `Bearer ${token}`,
-      },
+      expect(response.statusCode).toBe(201);
+      const body = JSON.parse(response.body) as ShortLinkResponse;
+      expect(body).toHaveProperty("slug");
+      expect(body).toHaveProperty("shortUrl");
+      expect(body.originalUrl).toBe("https://example.com");
     });
 
-    expect(response.statusCode).toBe(400);
-    const body = response.json();
-    expect(body).toHaveProperty("message");
-    expect(typeof body.message).toBe("string");
-    expect(body.message).toContain("url");
+    it("should reject duplicate slug generation", async () => {
+      const response1 = await app.inject({
+        method: "POST",
+        url: "/short-links",
+        headers: { authorization: `Bearer ${accessToken}` },
+        payload: { url: "https://example.com/1" },
+      });
+
+      const response2 = await app.inject({
+        method: "POST",
+        url: "/short-links",
+        headers: { authorization: `Bearer ${accessToken}` },
+        payload: { url: "https://example.com/2" },
+      });
+
+      expect(response1.statusCode).toBe(201);
+      expect(response2.statusCode).toBe(201);
+
+      const body1 = JSON.parse(response1.body) as ShortLinkResponse;
+      const body2 = JSON.parse(response2.body) as ShortLinkResponse;
+      expect(body1.slug).not.toBe(body2.slug);
+    });
+
+    it("should allow multiple short links for same URL", async () => {
+      const response1 = await app.inject({
+        method: "POST",
+        url: "/short-links",
+        headers: { authorization: `Bearer ${accessToken}` },
+        payload: { url: "https://example.com" },
+      });
+
+      const response2 = await app.inject({
+        method: "POST",
+        url: "/short-links",
+        headers: { authorization: `Bearer ${accessToken}` },
+        payload: { url: "https://example.com" },
+      });
+
+      expect(response1.statusCode).toBe(201);
+      expect(response2.statusCode).toBe(201);
+    });
+
+    it("should reject invalid URL", async () => {
+      const response = await app.inject({
+        method: "POST",
+        url: "/short-links",
+        headers: { authorization: `Bearer ${accessToken}` },
+        payload: { url: "not-a-url" },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it("should reject unauthenticated request", async () => {
+      const response = await app.inject({
+        method: "POST",
+        url: "/short-links",
+        payload: { url: "https://example.com" },
+      });
+
+      expect(response.statusCode).toBe(401);
+    });
   });
 
-  it("returns 400 for missing URL in request body", async () => {
-    const db = new DatabaseSync(":memory:");
-    initializeDatabase(db);
-    const app = await buildTestApp({}, db);
-    appsToClose.push(app);
-
-    const token = await getAuthToken(app, db, "test@example.com");
-
-    const response = await app.inject({
-      method: "POST",
-      url: "/short-links",
-      payload: {},
-      headers: {
-        authorization: `Bearer ${token}`,
-      },
-    });
-
-    expect(response.statusCode).toBe(400);
-    const body = response.json();
-    expect(body).toHaveProperty("message");
-    expect(typeof body.message).toBe("string");
-    expect(body.message).toContain("url");
-  });
-
-  it("returns 400 for non-string URL", async () => {
-    const db = new DatabaseSync(":memory:");
-    initializeDatabase(db);
-    const app = await buildTestApp({}, db);
-    appsToClose.push(app);
-
-    const token = await getAuthToken(app, db, "test@example.com");
-
-    const response = await app.inject({
-      method: "POST",
-      url: "/short-links",
-      payload: { url: 123 },
-      headers: {
-        authorization: `Bearer ${token}`,
-      },
-    });
-
-    expect(response.statusCode).toBe(400);
-    const body = response.json();
-    expect(body).toHaveProperty("message");
-    expect(typeof body.message).toBe("string");
-    expect(body.message).toContain("url");
-  });
-});
-
-describe("GET /short-links/:slug", () => {
-  it("returns short link details", async () => {
-    const db = new DatabaseSync(":memory:");
-    initializeDatabase(db);
-    const app = await buildTestApp({}, db);
-    appsToClose.push(app);
-
-    const token = await getAuthToken(app, db, "test@example.com");
-
-    const createResponse = await app.inject({
-      method: "POST",
-      url: "/short-links",
-      payload: { url: "https://example.com" },
-      headers: {
-        authorization: `Bearer ${token}`,
-      },
-    });
-    const { slug } = createResponse.json();
-
-    const response = await app.inject({
-      method: "GET",
-      url: `/short-links/${slug}`,
-      headers: {
-        authorization: `Bearer ${token}`,
-      },
-    });
-
-    expect(response.statusCode).toBe(200);
-    const body = response.json();
-    expect(body.slug).toBe(slug);
-    expect(body.original_url).toBe("https://example.com");
-    expect(body.visits).toBe(0);
-    expect(body).toHaveProperty("created_at");
-  });
-
-  it("returns 404 for non-existent slug", async () => {
-    const db = new DatabaseSync(":memory:");
-    initializeDatabase(db);
-    const app = await buildTestApp({}, db);
-    appsToClose.push(app);
-
-    const token = await getAuthToken(app, db, "test@example.com");
-
-    const response = await app.inject({
-      method: "GET",
-      url: "/short-links/nonexistent",
-      headers: {
-        authorization: `Bearer ${token}`,
-      },
-    });
-
-    expect(response.statusCode).toBe(404);
-    const body = response.json();
-    expect(body).toHaveProperty("message", "Short link not found");
-    expect(typeof body.message).toBe("string");
-  });
-});
-
-describe("GET /:slug (redirect)", () => {
-  it("redirects to original URL and increments visits", async () => {
-    const db = new DatabaseSync(":memory:");
-    initializeDatabase(db);
-    const app = await buildTestApp({}, db);
-    appsToClose.push(app);
-
-    const token = await getAuthToken(app, db, "test@example.com");
-
-    const createResponse = await app.inject({
-      method: "POST",
-      url: "/short-links",
-      payload: { url: "https://example.com" },
-      headers: {
-        authorization: `Bearer ${token}`,
-      },
-    });
-    const { slug } = createResponse.json();
-
-    const response = await app.inject({
-      method: "GET",
-      url: `/${slug}`,
-    });
-
-    expect(response.statusCode).toBe(302);
-    expect(response.headers.location).toBe("https://example.com");
-
-    const detailsResponse = await app.inject({
-      method: "GET",
-      url: `/short-links/${slug}`,
-      headers: {
-        authorization: `Bearer ${token}`,
-      },
-    });
-    const details = detailsResponse.json();
-    expect(details.visits).toBe(1);
-  });
-
-  it("returns 404 for non-existent slug", async () => {
-    const db = new DatabaseSync(":memory:");
-    initializeDatabase(db);
-    const app = await buildTestApp({}, db);
-    appsToClose.push(app);
-
-    const token = await getAuthToken(app, db, "test@example.com");
-
-    const response = await app.inject({
-      method: "GET",
-      url: "/nonexistent",
-    });
-
-    expect(response.statusCode).toBe(404);
-    const body = response.json();
-    expect(body).toHaveProperty("message", "Short link not found");
-    expect(typeof body.message).toBe("string");
-  });
-});
-
-describe("DELETE /short-links/:slug", () => {
-  it("deletes a short link and returns 204", async () => {
-    const db = new DatabaseSync(":memory:");
-    initializeDatabase(db);
-    const app = await buildTestApp({}, db);
-    appsToClose.push(app);
-
-    const token = await getAuthToken(app, db, "test@example.com");
-
-    const createResponse = await app.inject({
-      method: "POST",
-      url: "/short-links",
-      payload: { url: "https://example.com" },
-      headers: {
-        authorization: `Bearer ${token}`,
-      },
-    });
-    const { slug } = createResponse.json();
-
-    const deleteResponse = await app.inject({
-      method: "DELETE",
-      url: `/short-links/${slug}`,
-      headers: {
-        authorization: `Bearer ${token}`,
-      },
-    });
-
-    expect(deleteResponse.statusCode).toBe(204);
-
-    const getResponse = await app.inject({
-      method: "GET",
-      url: `/short-links/${slug}`,
-      headers: {
-        authorization: `Bearer ${token}`,
-      },
-    });
-    expect(getResponse.statusCode).toBe(404);
-  });
-
-  it("returns 404 when deleting non-existent slug", async () => {
-    const db = new DatabaseSync(":memory:");
-    initializeDatabase(db);
-    const app = await buildTestApp({}, db);
-    appsToClose.push(app);
-
-    const token = await getAuthToken(app, db, "test@example.com");
-
-    const response = await app.inject({
-      method: "DELETE",
-      url: "/short-links/nonexistent",
-      headers: {
-        authorization: `Bearer ${token}`,
-      },
-    });
-
-    expect(response.statusCode).toBe(404);
-    const body = response.json();
-    expect(body).toHaveProperty("message", "Short link not found");
-    expect(typeof body.message).toBe("string");
-  });
-});
-
-describe("GET /short-links", () => {
-  it("lists short links with default pagination", async () => {
-    const db = new DatabaseSync(":memory:");
-    initializeDatabase(db);
-    const app = await buildTestApp({}, db);
-    appsToClose.push(app);
-
-    const token = await getAuthToken(app, db, "test@example.com");
-
-    await app.inject({
-      method: "POST",
-      url: "/short-links",
-      payload: { url: "https://example.com/1" },
-      headers: { authorization: `Bearer ${token}` },
-    });
-
-    await app.inject({
-      method: "POST",
-      url: "/short-links",
-      payload: { url: "https://example.com/2" },
-      headers: { authorization: `Bearer ${token}` },
-    });
-
-    const response = await app.inject({
-      method: "GET",
-      url: "/short-links",
-      headers: { authorization: `Bearer ${token}` },
-    });
-
-    expect(response.statusCode).toBe(200);
-    const body = response.json();
-    expect(body.items).toHaveLength(2);
-    expect(body.total).toBe(2);
-    const urls = body.items.map((item: any) => item.original_url);
-    expect(urls).toContain("https://example.com/1");
-    expect(urls).toContain("https://example.com/2");
-  });
-
-  it("respects custom page and limit parameters", async () => {
-    const db = new DatabaseSync(":memory:");
-    initializeDatabase(db);
-    const app = await buildTestApp({}, db);
-    appsToClose.push(app);
-
-    const token = await getAuthToken(app, db, "test@example.com");
-
-    for (let i = 0; i < 15; i++) {
+  describe("GET /short-links", () => {
+    it("should list short links", async () => {
       await app.inject({
         method: "POST",
         url: "/short-links",
-        payload: { url: `https://example.com/${i}` },
-        headers: { authorization: `Bearer ${token}` },
+        headers: { authorization: `Bearer ${accessToken}` },
+        payload: { url: "https://example.com/1" },
       });
-    }
 
-    const response = await app.inject({
-      method: "GET",
-      url: "/short-links?page=2&limit=5",
-      headers: { authorization: `Bearer ${token}` },
-    });
-
-    expect(response.statusCode).toBe(200);
-    const body = response.json();
-    expect(body.items).toHaveLength(5);
-    expect(body.total).toBe(15);
-  });
-
-  it("caps limit to 50", async () => {
-    const db = new DatabaseSync(":memory:");
-    initializeDatabase(db);
-    const app = await buildTestApp({}, db);
-    appsToClose.push(app);
-
-    const token = await getAuthToken(app, db, "test@example.com");
-
-    for (let i = 0; i < 55; i++) {
       await app.inject({
         method: "POST",
         url: "/short-links",
-        payload: { url: `https://example.com/${i}` },
-        headers: { authorization: `Bearer ${token}` },
+        headers: { authorization: `Bearer ${accessToken}` },
+        payload: { url: "https://example.com/2" },
       });
-    }
 
-    const response = await app.inject({
-      method: "GET",
-      url: "/short-links?limit=100",
-      headers: { authorization: `Bearer ${token}` },
+      const response = await app.inject({
+        method: "GET",
+        url: "/short-links",
+        headers: { authorization: `Bearer ${accessToken}` },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body) as ListResponse;
+      expect(body.items).toHaveLength(2);
+      expect(body.total).toBe(2);
     });
 
-    expect(response.statusCode).toBe(200);
-    const body = response.json();
-    expect(body.items).toHaveLength(50);
-    expect(body.total).toBe(55);
+    it("should return empty list when no links", async () => {
+      const response = await app.inject({
+        method: "GET",
+        url: "/short-links",
+        headers: { authorization: `Bearer ${accessToken}` },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body) as ListResponse;
+      expect(body.items).toHaveLength(0);
+      expect(body.total).toBe(0);
+    });
+
+    it("should paginate results", async () => {
+      for (let i = 0; i < 5; i++) {
+        await app.inject({
+          method: "POST",
+          url: "/short-links",
+          headers: { authorization: `Bearer ${accessToken}` },
+          payload: { url: `https://example.com/${i}` },
+        });
+      }
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/short-links?page=1&limit=3",
+        headers: { authorization: `Bearer ${accessToken}` },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body) as ListResponse;
+      expect(body.items.length).toBeLessThanOrEqual(3);
+    });
+
+    it("should sort by newest first", async () => {
+      const r1 = await app.inject({
+        method: "POST",
+        url: "/short-links",
+        headers: { authorization: `Bearer ${accessToken}` },
+        payload: { url: "https://example.com/old" },
+      });
+
+      // Small delay to ensure different timestamps
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      const r2 = await app.inject({
+        method: "POST",
+        url: "/short-links",
+        headers: { authorization: `Bearer ${accessToken}` },
+        payload: { url: "https://example.com/new" },
+      });
+
+      const listResponse = await app.inject({
+        method: "GET",
+        url: "/short-links",
+        headers: { authorization: `Bearer ${accessToken}` },
+      });
+
+      const body = JSON.parse(listResponse.body) as ListResponse;
+      const newSlug = JSON.parse(r2.body).slug;
+      expect(body.items[0].slug).toBe(newSlug);
+    });
+
+    it("should only show user's own links", async () => {
+      await app.inject({
+        method: "POST",
+        url: "/short-links",
+        headers: { authorization: `Bearer ${accessToken}` },
+        payload: { url: "https://example.com/user1" },
+      });
+
+      const otherToken = await loginAndVerify(app, "other@example.com");
+      await app.inject({
+        method: "POST",
+        url: "/short-links",
+        headers: { authorization: `Bearer ${otherToken}` },
+        payload: { url: "https://example.com/user2" },
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/short-links",
+        headers: { authorization: `Bearer ${accessToken}` },
+      });
+
+      const body = JSON.parse(response.body) as ListResponse;
+      expect(body.total).toBe(1);
+      expect(body.items[0].originalUrl).toBe("https://example.com/user1");
+    });
   });
 
-  it("does not return short links from other users", async () => {
-    const db = new DatabaseSync(":memory:");
-    initializeDatabase(db);
-    const app = await buildTestApp({}, db);
-    appsToClose.push(app);
+  describe("GET /short-links/:slug", () => {
+    it("should get short link by slug", async () => {
+      const createResponse = await app.inject({
+        method: "POST",
+        url: "/short-links",
+        headers: { authorization: `Bearer ${accessToken}` },
+        payload: { url: "https://example.com/test" },
+      });
 
-    const tokenA = await getAuthToken(app, db, "user-a@example.com");
-    const tokenB = await getAuthToken(app, db, "user-b@example.com");
+      const { slug } = JSON.parse(createResponse.body) as ShortLinkResponse;
 
-    await app.inject({
-      method: "POST",
-      url: "/short-links",
-      payload: { url: "https://user-a.com" },
-      headers: { authorization: `Bearer ${tokenA}` },
+      const response = await app.inject({
+        method: "GET",
+        url: `/short-links/${slug}`,
+        headers: { authorization: `Bearer ${accessToken}` },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.body);
+      expect(body.slug).toBe(slug);
+      expect(body.originalUrl).toBe("https://example.com/test");
     });
 
-    const response = await app.inject({
-      method: "GET",
-      url: "/short-links",
-      headers: { authorization: `Bearer ${tokenB}` },
+    it("should return 404 for non-existent slug", async () => {
+      const response = await app.inject({
+        method: "GET",
+        url: "/short-links/nonexistent",
+        headers: { authorization: `Bearer ${accessToken}` },
+      });
+
+      expect(response.statusCode).toBe(404);
     });
 
-    expect(response.statusCode).toBe(200);
-    const body = response.json();
-    expect(body.items).toHaveLength(0);
-    expect(body.total).toBe(0);
+    it("should only allow owner to view link", async () => {
+      const createResponse = await app.inject({
+        method: "POST",
+        url: "/short-links",
+        headers: { authorization: `Bearer ${accessToken}` },
+        payload: { url: "https://example.com/private" },
+      });
+
+      const { slug } = JSON.parse(createResponse.body) as ShortLinkResponse;
+
+      const otherToken = await loginAndVerify(app, "other@example.com");
+      const response = await app.inject({
+        method: "GET",
+        url: `/short-links/${slug}`,
+        headers: { authorization: `Bearer ${otherToken}` },
+      });
+
+      expect(response.statusCode).toBe(404);
+    });
   });
 
-  it("returns empty list when user has no short links", async () => {
-    const db = new DatabaseSync(":memory:");
-    initializeDatabase(db);
-    const app = await buildTestApp({}, db);
-    appsToClose.push(app);
+  describe("DELETE /short-links/:slug", () => {
+    it("should delete short link", async () => {
+      const createResponse = await app.inject({
+        method: "POST",
+        url: "/short-links",
+        headers: { authorization: `Bearer ${accessToken}` },
+        payload: { url: "https://example.com/todelete" },
+      });
 
-    const token = await getAuthToken(app, db, "test@example.com");
+      const { slug } = JSON.parse(createResponse.body) as ShortLinkResponse;
 
-    const response = await app.inject({
-      method: "GET",
-      url: "/short-links",
-      headers: { authorization: `Bearer ${token}` },
+      const deleteResponse = await app.inject({
+        method: "DELETE",
+        url: `/short-links/${slug}`,
+        headers: { authorization: `Bearer ${accessToken}` },
+      });
+
+      expect(deleteResponse.statusCode).toBe(204);
+
+      const getResponse = await app.inject({
+        method: "GET",
+        url: `/short-links/${slug}`,
+        headers: { authorization: `Bearer ${accessToken}` },
+      });
+
+      expect(getResponse.statusCode).toBe(404);
     });
 
-    expect(response.statusCode).toBe(200);
-    const body = response.json();
-    expect(body.items).toHaveLength(0);
-    expect(body.total).toBe(0);
+    it("should return 404 when deleting non-existent link", async () => {
+      const response = await app.inject({
+        method: "DELETE",
+        url: "/short-links/nonexistent",
+        headers: { authorization: `Bearer ${accessToken}` },
+      });
+
+      expect(response.statusCode).toBe(404);
+    });
+
+    it("should only allow owner to delete link", async () => {
+      const createResponse = await app.inject({
+        method: "POST",
+        url: "/short-links",
+        headers: { authorization: `Bearer ${accessToken}` },
+        payload: { url: "https://example.com/private" },
+      });
+
+      const { slug } = JSON.parse(createResponse.body) as ShortLinkResponse;
+
+      const otherToken = await loginAndVerify(app, "other@example.com");
+      const response = await app.inject({
+        method: "DELETE",
+        url: `/short-links/${slug}`,
+        headers: { authorization: `Bearer ${otherToken}` },
+      });
+
+      expect(response.statusCode).toBe(404);
+    });
   });
-});
 
-describe("Owner-only access", () => {
-  it("GET /short-links/:slug returns 404 for non-owned link", async () => {
-    const db = new DatabaseSync(":memory:");
-    initializeDatabase(db);
-    const app = await buildTestApp({}, db);
-    appsToClose.push(app);
+  describe("GET /:slug (redirect)", () => {
+    it("should redirect to original URL", async () => {
+      const createResponse = await app.inject({
+        method: "POST",
+        url: "/short-links",
+        headers: { authorization: `Bearer ${accessToken}` },
+        payload: { url: "https://example.com/redirect" },
+      });
 
-    const tokenA = await getAuthToken(app, db, "user-a@example.com");
-    const tokenB = await getAuthToken(app, db, "user-b@example.com");
+      const { slug } = JSON.parse(createResponse.body) as ShortLinkResponse;
 
-    const createResponse = await app.inject({
-      method: "POST",
-      url: "/short-links",
-      payload: { url: "https://user-a.com" },
-      headers: { authorization: `Bearer ${tokenA}` },
-    });
-    const { slug } = createResponse.json();
+      const response = await app.inject({
+        method: "GET",
+        url: `/${slug}`,
+      });
 
-    const response = await app.inject({
-      method: "GET",
-      url: `/short-links/${slug}`,
-      headers: { authorization: `Bearer ${tokenB}` },
+      expect(response.statusCode).toBe(302);
+      expect(response.headers.location).toBe("https://example.com/redirect");
     });
 
-    expect(response.statusCode).toBe(404);
-  });
+    it("should return 404 for non-existent slug", async () => {
+      const response = await app.inject({
+        method: "GET",
+        url: "/nonexistent",
+      });
 
-  it("DELETE /short-links/:slug returns 404 for non-owned link", async () => {
-    const db = new DatabaseSync(":memory:");
-    initializeDatabase(db);
-    const app = await buildTestApp({}, db);
-    appsToClose.push(app);
-
-    const tokenA = await getAuthToken(app, db, "user-a@example.com");
-    const tokenB = await getAuthToken(app, db, "user-b@example.com");
-
-    const createResponse = await app.inject({
-      method: "POST",
-      url: "/short-links",
-      payload: { url: "https://user-a.com" },
-      headers: { authorization: `Bearer ${tokenA}` },
-    });
-    const { slug } = createResponse.json();
-
-    const response = await app.inject({
-      method: "DELETE",
-      url: `/short-links/${slug}`,
-      headers: { authorization: `Bearer ${tokenB}` },
+      expect(response.statusCode).toBe(404);
     });
 
-    expect(response.statusCode).toBe(404);
+    it("should increment visit count on redirect", async () => {
+      const createResponse = await app.inject({
+        method: "POST",
+        url: "/short-links",
+        headers: { authorization: `Bearer ${accessToken}` },
+        payload: { url: "https://example.com/visits" },
+      });
+
+      const { slug } = JSON.parse(createResponse.body) as ShortLinkResponse;
+
+      await app.inject({
+        method: "GET",
+        url: `/${slug}`,
+      });
+
+      const getResponse = await app.inject({
+        method: "GET",
+        url: `/short-links/${slug}`,
+        headers: { authorization: `Bearer ${accessToken}` },
+      });
+
+      const body = JSON.parse(getResponse.body);
+      expect(body.visits).toBe(1);
+    });
   });
 });

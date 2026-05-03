@@ -88,7 +88,7 @@ export const registerShortLinksRoutes = async (
       const page = request.query.page;
       const limit = request.query.limit;
 
-      const result = shortLinkService.list(userId, page, limit);
+      const result = await shortLinkService.list(userId, page, limit);
 
       return reply.status(200).send(result);
     },
@@ -103,7 +103,7 @@ export const registerShortLinksRoutes = async (
       const { url } = request.body;
       const userId = request.user.userId;
 
-      const result = shortLinkService.create(url, userId, request.protocol, request.host);
+      const result = await shortLinkService.create(url, userId, request.protocol, request.host);
 
       return reply.status(201).send(result);
     },
@@ -118,7 +118,7 @@ export const registerShortLinksRoutes = async (
       const { slug } = request.params;
       const userId = request.user.userId;
 
-      const shortLink = shortLinkService.get(slug, userId);
+      const shortLink = await shortLinkService.get(slug, userId);
 
       if (!shortLink) {
         return reply.status(404).send({
@@ -139,7 +139,7 @@ export const registerShortLinksRoutes = async (
       const { slug } = request.params;
       const userId = request.user.userId;
 
-      const deleted = shortLinkService.delete(slug, userId);
+      const deleted = await shortLinkService.delete(slug, userId);
 
       if (!deleted) {
         return reply.status(404).send({
@@ -169,7 +169,7 @@ export const registerShortLinksRoutes = async (
     async (request, reply) => {
       const { slug } = request.params;
 
-      const result = shortLinkService.redirect(slug);
+      const result = await shortLinkService.redirect(slug);
 
       if ("status" in result && result.status === 404) {
         return reply.status(404).send({ message: result.message });

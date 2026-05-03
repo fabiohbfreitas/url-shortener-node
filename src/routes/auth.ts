@@ -40,20 +40,20 @@ export const registerAuthRoutes = async (
     schema: requestCodeSchema,
     handler: async (request, reply) => {
       const { email } = request.body;
-      const result = authService.login(email);
+      const result = await authService.login(email);
       return reply.status(200).send(result);
     },
   });
 
   app.withTypeProvider<FastifyZodOpenApiTypeProvider>().route({
     method: "POST",
-    url: "/auth/login/verify",
+    url: "/auth/verify",
     schema: verifyCodeSchema,
     handler: async (request, reply) => {
       const { email, code } = request.body;
 
       try {
-        const result = authService.verify(email, code);
+        const result = await authService.verify(email, code);
         return reply.status(200).send(result);
       } catch {
         return reply.status(401).send({ message: "Invalid or expired code" });

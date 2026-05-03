@@ -1,42 +1,36 @@
-import { initLogger } from "evlog";
-import { buildApp } from "./app.js";
 import { config } from "./config.js";
-import { getDatabase } from "./infrastructure/database.js";
-import { ConsoleAuthNotifier, NoopAuthNotifier } from "./infrastructure/auth-notifier.js";
-import type { AuthNotifier } from "./infrastructure/auth-notifier.js";
+import { buildApp } from "./app.js";
+import { MongoUserRepository } from "./infrastructure/mongo-user-repository.js";
+import { MongoShortLinkRepository } from "./infrastructure/mongo-short-link-repository.js";
+import { ConsoleAuthNotifier } from "./infrastructure/auth-notifier.js";
+import { createDatabase } from "./infrastructure/db.js";
 
-const createAuthNotifier = (): AuthNotifier => {
-  if (config.nodeEnv === "test") {
-    return new NoopAuthNotifier();
-  }
-  return new ConsoleAuthNotifier();
-};
+const start = async () => {
+  const appConfig = config;
 
-const start = async (): Promise<void> => {
-  initLogger({
-    env: {
-      service: config.serviceName,
-      environment: config.nodeEnv,
-    },
-    pretty: config.nodeEnv === "development",
-  });
+  
+  const { User, AuthCode, ShortLink } = await createDatabase(appConfig.mongodbUri, 'url-shortener');
 
-  const authNotifier = createAuthNotifier();
-  const db = getDatabase();
-  const app = await buildApp(config, db, authNotifier);
+  const userRepo = new MongoUserRepository(User, AuthCode);
+  const shortLinkRepo = new MongoShortLinkRepository(ShortLink);
+  const authNotifier = new ConsoleAuthNotifier();
+
+  const app = await buildApp(appConfig, userRepo, shortLinkRepo, authNotifier);
 
   try {
-    await app.listen({
-      host: config.host,
-      port: config.port,
-    });
-    app.log.info(
-      `Server running at http://${config.host}:${config.port} (docs: /docs, openapi: /openapi.json)`,
-    );
-  } catch (error) {
-    app.log.error(error);
-    process.exitCode = 1;
+    await app.listen({ port: appConfig.port, host: appConfig.host });
+  } catch (err) {
+    console.error(err);
+    process.exit(1);
   }
+
+  const shutdown = async () => {
+    await app.close();
+    process.exit(0);
+  };
+
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
 };
 
-void start();
+start();

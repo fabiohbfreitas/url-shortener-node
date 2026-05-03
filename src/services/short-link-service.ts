@@ -1,62 +1,57 @@
-import type { DatabaseSync } from "../infrastructure/database.js";
-import type { ShortLink } from "../domain/short-link.js";
-import {
-  createShortLink,
-  findShortLinkBySlug,
-  findShortLinkBySlugAndUserId,
-  incrementVisits,
-  deleteShortLinkBySlugAndUserId,
-  listShortLinksByUserId,
-} from "../infrastructure/database.js";
+import type { ShortLinkDocument } from "../infrastructure/db.js";
+import type { IShortLinkRepository } from "../infrastructure/short-link-repository.js";
 import { generateUniqueSlug } from "../utils/slug.js";
 
 export class ShortLinkService {
-  constructor(private db: DatabaseSync) {}
+  constructor(private shortLinkRepo: IShortLinkRepository) {}
 
-  create(
+  async create(
     url: string,
-    userId: number,
+    userId: string,
     protocol: string,
     host: string,
-  ): { slug: string; shortUrl: string; originalUrl: string } {
-    const slug = generateUniqueSlug((s: string) => {
-      const existing = findShortLinkBySlug(this.db, s);
-      return existing !== undefined;
+  ): Promise<{ slug: string; shortUrl: string; originalUrl: string }> {
+    const slug = await generateUniqueSlug(async (s: string) => {
+      const existing = await this.shortLinkRepo.findShortLinkBySlug(s);
+      return !!existing;
     });
 
-    const shortLink = createShortLink(this.db, slug, url, userId);
+    await this.shortLinkRepo.createShortLink(slug, url, userId);
 
     const shortUrl = `${protocol}://${host}/${slug}`;
 
     return {
-      slug: shortLink.slug,
+      slug,
       shortUrl,
-      originalUrl: shortLink.original_url,
+      originalUrl: url,
     };
   }
 
-  list(userId: number, page: number, limit: number): { items: ShortLink[]; total: number } {
-    const cappedLimit = Math.min(limit, 50);
-    return listShortLinksByUserId(this.db, userId, page, cappedLimit);
+  async list(
+    userId: string,
+    page: number,
+    limit: number,
+  ): Promise<{ items: ShortLinkDocument[]; total: number }> {
+    return await this.shortLinkRepo.listShortLinksByUserId(userId, page, limit);
   }
 
-  get(slug: string, userId: number): ShortLink | undefined {
-    return findShortLinkBySlugAndUserId(this.db, slug, userId);
+  async get(slug: string, userId: string): Promise<ShortLinkDocument | null> {
+    return await this.shortLinkRepo.findShortLinkBySlugAndUserId(slug, userId);
   }
 
-  delete(slug: string, userId: number): boolean {
-    return deleteShortLinkBySlugAndUserId(this.db, slug, userId);
+  async delete(slug: string, userId: string): Promise<boolean> {
+    return await this.shortLinkRepo.deleteShortLinkBySlugAndUserId(slug, userId);
   }
 
-  redirect(slug: string): { originalUrl: string } | { message: string; status: number } {
-    const shortLink = findShortLinkBySlug(this.db, slug);
+  async redirect(slug: string): Promise<{ originalUrl: string } | { message: string; status: number }> {
+    const shortLink = await this.shortLinkRepo.findShortLinkBySlug(slug);
 
     if (!shortLink) {
       return { message: "Short link not found", status: 404 };
     }
 
-    incrementVisits(this.db, slug);
+    await this.shortLinkRepo.incrementVisits(slug);
 
-    return { originalUrl: shortLink.original_url as string };
+    return { originalUrl: shortLink.originalUrl };
   }
 }

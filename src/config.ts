@@ -8,6 +8,7 @@ export type AppConfig = {
   jwtSecret: string;
   jwtAccessExpiresIn: string;
   authCodeExpiresIn: string;
+  mongodbUri: string;
 };
 
 const envSchema = z.object({
@@ -18,6 +19,7 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(32),
   JWT_ACCESS_EXPIRES_IN: z.string().default("15m"),
   AUTH_CODE_EXPIRES_IN: z.string().default("10m"),
+  MONGODB_URI: z.string().min(1),
 });
 
 const env = envSchema.parse(process.env);
@@ -30,4 +32,5 @@ export const config: AppConfig = {
   jwtSecret: env.JWT_SECRET,
   jwtAccessExpiresIn: env.JWT_ACCESS_EXPIRES_IN,
   authCodeExpiresIn: env.AUTH_CODE_EXPIRES_IN,
+  mongodbUri: env.MONGODB_URI,
 };

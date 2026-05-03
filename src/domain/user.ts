@@ -1,22 +1,23 @@
 import { z } from "zod/v4";
 
 export const UserSchema = z.object({
-  id: z.number().int().positive(),
+  _id: z.any(),
   email: z.string().email(),
-  created_at: z.string(),
-  updated_at: z.string(),
-  last_login_at: z.string().nullable(),
+  lastLoginAt: z.string().nullable(),
+  createdAt: z.any(),
+  updatedAt: z.any(),
 });
 
 export type User = z.infer<typeof UserSchema>;
 
 export const AuthCodeSchema = z.object({
-  id: z.number().int().positive(),
-  user_id: z.number().int().positive(),
+  _id: z.any(),
+  userId: z.any(),
   code: z.string().min(1),
-  expires_at: z.string(),
-  used_at: z.string().nullable(),
-  created_at: z.string(),
+  expiresAt: z.string(),
+  usedAt: z.string().nullable(),
+  createdAt: z.any(),
+  updatedAt: z.any(),
 });
 
 export type AuthCode = z.infer<typeof AuthCodeSchema>;

@@ -11,12 +11,12 @@ export const generateSlug = (): string => {
   return slug;
 };
 
-export const generateUniqueSlug = (existsFn: (slug: string) => boolean): string => {
+export const generateUniqueSlug = async (existsFn: (slug: string) => Promise<boolean>): Promise<string> => {
   let slug = generateSlug();
   let attempts = 0;
   const MAX_ATTEMPTS = 100;
 
-  while (existsFn(slug) && attempts < MAX_ATTEMPTS) {
+  while (await existsFn(slug) && attempts < MAX_ATTEMPTS) {
     slug = generateSlug();
     attempts++;
   }

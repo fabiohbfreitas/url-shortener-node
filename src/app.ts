@@ -15,14 +15,16 @@ import { registerAuthPlugin } from "./plugins/auth.js";
 import { registerHealthRoute } from "./routes/health.js";
 import { registerShortLinksRoutes } from "./routes/short-links.js";
 import { registerAuthRoutes } from "./routes/auth.js";
-import type { DatabaseSync } from "./infrastructure/database.js";
+import type { AuthNotifier } from "./infrastructure/auth-notifier.js";
 import { AuthService } from "./services/auth-service.js";
 import { ShortLinkService } from "./services/short-link-service.js";
-import type { AuthNotifier } from "./infrastructure/auth-notifier.js";
+import type { IUserRepository } from "./infrastructure/user-repository.js";
+import type { IShortLinkRepository } from "./infrastructure/short-link-repository.js";
 
 export const buildApp = async (
   config: AppConfig,
-  database: DatabaseSync,
+  userRepo: IUserRepository,
+  shortLinkRepo: IShortLinkRepository,
   authNotifier: AuthNotifier,
 ) => {
   const app = Fastify({ logger: false });
@@ -72,8 +74,8 @@ export const buildApp = async (
 
   await app.register(registerAuthPlugin, config);
 
-  const authService = new AuthService(database, authNotifier, app);
-  const shortLinkService = new ShortLinkService(database);
+  const authService = new AuthService(userRepo, authNotifier, app);
+  const shortLinkService = new ShortLinkService(shortLinkRepo);
 
   await registerAuthRoutes(app, authService);
   await registerHealthRoute(app, config.serviceName);
